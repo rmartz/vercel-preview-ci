@@ -107,6 +107,7 @@ jobs:
       # Fail with a clear message rather than an opaque CLI auth error.
       - name: Check Vercel secrets
         run: |
+          set -euo pipefail
           missing=""
           for name in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
             if [ -z "${!name}" ]; then missing="$missing $name"; fi
@@ -147,7 +148,7 @@ jobs:
             version=$(node -p "require('./_vercel-preview-ci/package.json').dependencies.vercel")
             rm -rf _vercel-preview-ci
           fi
-          if ! printf '%s' "$version" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+          if ! grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$' <<< "$version"; then
             echo "::error::Vercel CLI version must be an exact x.y.z, got '$version'."
             exit 1
           fi
@@ -192,7 +193,7 @@ jobs:
         run: |
           set -euo pipefail
           url=$(vercel deploy --prebuilt --yes --token="$VERCEL_TOKEN" | tail -n 1)
-          if ! printf '%s' "$url" | grep -qE '^https://[^[:space:]]+$'; then
+          if ! grep -qE '^https://[^[:space:]]+$' <<< "$url"; then
             echo "::error::Could not read a deployment URL from 'vercel deploy' (got '$url')."
             exit 1
           fi
@@ -202,7 +203,13 @@ jobs:
       # One comment per PR, found by its marker and edited in place. The marker
       # matches the one the per-repo workflows used, so a migrating repo's
       # existing comment is reused rather than duplicated.
+      #
+      # Skipped when Dependabot triggered the run: GitHub gives such runs a
+      # read-only token, so the comment write would fail AFTER a successful
+      # deploy. The URL is still in the job summary and the `url` output. A
+      # person labelling a Dependabot PR is the actor, so that run comments.
       - name: Post or update the sticky PR comment
+        if: github.actor != 'dependabot[bot]'
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -217,8 +224,10 @@ jobs:
 
           $URL"
           # --paginate runs --jq once per page, so take the first id overall.
+          # `sed -n 1p` reads all input, unlike `head`, so gh never takes a
+          # SIGPIPE that pipefail would turn into a failure.
           existing=$(gh api --paginate "repos/$REPO/issues/$PR/comments?per_page=100" \
-            --jq ".[] | select(.body | startswith(\"$marker\")) | .id" | head -n 1)
+            --jq ".[] | select(.body | startswith(\"$marker\")) | .id" | sed -n 1p)
           if [ -n "$existing" ]; then
             gh api -X PATCH "repos/$REPO/issues/comments/$existing" -f body="$body" > /dev/null
           else

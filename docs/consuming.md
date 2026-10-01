@@ -57,10 +57,14 @@ full `# vX.Y.Z` comment so Dependabot can bump it.
 The job fails with a clear error if any of them is missing. Repos that already
 ran a per-repo `preview-deploy.yml` have them set.
 
-Dependabot PRs receive only **Dependabot** secrets, not Actions secrets. A
-labelled Dependabot PR therefore fails at the secrets check unless the three
-secrets are also set with `gh secret set <name> --app dependabot`. Dependabot
-bumps rarely need UAT, so most repos can leave this unset.
+A run that **Dependabot** triggers (for example, its rebase of a labelled PR)
+receives only Dependabot secrets and a read-only token. Such a run fails at the
+secrets check unless the three secrets are also set with
+`gh secret set <name> --app dependabot`. If they are set, the preview deploys,
+but the comment step is skipped because the token cannot write. The URL is still
+in the job summary and the `url` output. A run started by a person labelling a
+Dependabot PR is an ordinary run and comments as usual. Dependabot bumps rarely
+need UAT, so most repos can leave the Dependabot secrets unset.
 
 ## Inputs and output
 
@@ -117,4 +121,7 @@ this repo is a release, so consumers receive CLI updates through the same pin.
 5. Verify the change with the steps in
    [Disabling Git-integration previews](disabling-git-previews.md#verifying-it).
 
-The `.github/dependabot.yml` and secrets need no change.
+The three Vercel secrets need no change; a repo that ran its own
+`preview-deploy.yml` already has them. Check that `.github/dependabot.yml` has a
+`github-actions` entry. Without one, the new `@<sha>` pin is never bumped (see
+[Keeping the pin current](#keeping-the-pin-current)).

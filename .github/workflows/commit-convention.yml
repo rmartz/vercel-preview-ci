@@ -39,7 +39,7 @@ jobs:
           # refactor, test, style, ci, build) may not carry it.
           pattern='^((feat|fix|perf|revert)(\([^)]+\))?!?|(docs|chore|refactor|test|style|ci|build)(\([^)]+\))?): [^[:space:]].*$'
           # On a branch's first push BEFORE is all-zeros; validate just the tip.
-          if printf '%s' "$BEFORE" | grep -qE '^0+$'; then
+          if grep -qE '^0+$' <<< "$BEFORE"; then
             revs="$AFTER"
           else
             revs="$(git rev-list --first-parent "${BEFORE}..${AFTER}")"
@@ -47,7 +47,7 @@ jobs:
           status=0
           for sha in $revs; do
             subject="$(git show -s --format=%s "$sha")"
-            if printf '%s\n' "$subject" | grep -qE "$pattern"; then
+            if grep -qE "$pattern" <<< "$subject"; then
               echo "ok:   $sha $subject"
             else
               echo "FAIL: $sha $subject"
