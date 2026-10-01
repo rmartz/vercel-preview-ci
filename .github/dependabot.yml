@@ -1,0 +1,58 @@
+version: 2
+# Cooldown: since 2026-07-14 Dependabot waits 3 days after a release before
+# proposing it, even with no `cooldown` configured. Third-party dependencies keep
+# that default (security updates are never delayed by it). Only first-party
+# actions and reusable workflows (`rmartz/*`) are exempt: they're published from
+# our own repos with provenance, so the wait adds no supply-chain protection and
+# only holds fixes back from the fleet.
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      # Explicit, so declaring the block can't change the third-party default.
+      default-days: 3
+      exclude:
+        - 'rmartz/*'
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      # Minor/patch bumps batched; majors fall out into isolated PRs for review.
+      github-actions:
+        patterns:
+          - '*'
+        update-types:
+          - minor
+          - patch
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      # Split by dependency type (rmartz/ai#82). The only production dependency
+      # is `vercel`: the reusable workflow installs exactly that version in every
+      # consumer, so its bump is a `fix` that cuts a release. A dev-dependency
+      # bump never reaches the consumer-run path, so it is a release-less `chore`.
+      prefix: fix
+      prefix-development: chore
+      include: scope
+    groups:
+      # Prettier isolated into its own group so a reformatting bump can't hide in a
+      # catch-all (a Prettier minor can reformat the whole tree).
+      prettier:
+        patterns:
+          - 'prettier'
+      dev-dependencies:
+        dependency-type: development
+        exclude-patterns:
+          - 'prettier'
+        update-types:
+          - minor
+          - patch
+      production-dependencies:
+        dependency-type: production
+        update-types:
+          - minor
+          - patch

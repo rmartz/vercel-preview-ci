@@ -1,0 +1,226 @@
+name: Vercel Preview (reusable)
+
+# Label-driven Vercel preview deploy for a consuming repo. A preview exists to
+# enable UAT, so one is deployed only when a PR is marked ready for UAT, not on
+# every push. The Vercel CLI builds the PR head here in Actions and deploys the
+# prebuilt output; the URL is posted as one update-in-place PR comment. The
+# consumer's caller is about 10 lines (see docs/consuming.md):
+#
+#   on:
+#     pull_request:
+#       types: [labeled, unlabeled, synchronize, reopened, ready_for_review]
+#   jobs:
+#     preview:
+#       uses: rmartz/vercel-preview-ci/.github/workflows/vercel-preview.yml@<sha>  # vX.Y.Z
+#       secrets: inherit   # VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
+#
+# The consumer turns off Vercel's Git-integration previews declaratively
+# (`git.deploymentEnabled` in vercel.json, see docs/disabling-git-previews.md),
+# so this workflow is the only way a preview gets built. The CLI deploy below
+# bypasses that setting.
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: 'Node.js version for the build. Match the Vercel project setting.'
+        type: string
+        required: false
+        default: 24.x
+      vercel-version:
+        description: >-
+          Exact Vercel CLI version. Leave empty (recommended) to use the version
+          pinned in this repo's package.json, which Dependabot keeps current.
+        type: string
+        required: false
+        default: ''
+      timeout-minutes:
+        description: 'Backstop job timeout. Size it from the measured build time; do not just raise it.'
+        type: number
+        required: false
+        default: 10
+    outputs:
+      url:
+        description: 'The preview deployment URL. Empty when the gate skipped the deploy.'
+        value: ${{ jobs.deploy.outputs.url }}
+    secrets:
+      VERCEL_TOKEN:
+        description: 'Vercel access token scoped to the project team.'
+        required: false
+      VERCEL_ORG_ID:
+        description: 'Vercel team (org) id: `orgId` in .vercel/project.json.'
+        required: false
+      VERCEL_PROJECT_ID:
+        description: 'Vercel project id: `projectId` in .vercel/project.json.'
+        required: false
+
+# A called workflow can only narrow the caller's grant, never widen it, so the
+# caller must grant these too (docs/consuming.md). `packages: read` lets the job
+# token resolve same-owner GitHub Packages for a consumer whose .npmrc scopes
+# one; `pull-requests: write` posts the sticky comment.
+permissions:
+  contents: read
+  packages: read
+  pull-requests: write
+
+jobs:
+  deploy:
+    name: Deploy preview
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    # The gate. Every term is a fleet contract (docs/gating.md):
+    #  - pull_request events only, and same-repo PRs only: fork PRs get no
+    #    secrets, and the Vercel token must never reach fork-authored code.
+    #  - not a draft, and not held by `do not merge`.
+    #  - the PR carries `UAT ready`, or the legacy `ready for UAT` while the
+    #    fleet-wide rename (rmartz/dotfiles#1572) is in progress.
+    #  - the event could change what the preview should show: a new head commit
+    #    (synchronize), a reopen, leaving draft, the UAT label itself being
+    #    added, or `do not merge` being removed. Adding an unrelated label to an
+    #    already-labelled PR must NOT redeploy, or every triage label costs a
+    #    build.
+    if: >-
+      github.event_name == 'pull_request'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && !github.event.pull_request.draft
+      && !contains(github.event.pull_request.labels.*.name, 'do not merge')
+      && (contains(github.event.pull_request.labels.*.name, 'UAT ready')
+        || contains(github.event.pull_request.labels.*.name, 'ready for UAT'))
+      && (contains(fromJSON('["synchronize","reopened","ready_for_review"]'), github.event.action)
+        || (github.event.action == 'labeled'
+          && (github.event.label.name == 'UAT ready' || github.event.label.name == 'ready for UAT'))
+        || (github.event.action == 'unlabeled' && github.event.label.name == 'do not merge'))
+    # Per-PR, job-level: a newer push supersedes an in-flight deploy of an older
+    # commit. Job-level (not workflow-level) so an event the gate skips never
+    # joins the group and cannot cancel a deploy that is still needed.
+    concurrency:
+      group: vercel-preview-${{ github.repository }}-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_TELEMETRY_DISABLED: '1'
+    steps:
+      # Fail with a clear message rather than an opaque CLI auth error.
+      - name: Check Vercel secrets
+        run: |
+          missing=""
+          for name in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!name}" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing secret(s):$missing. Pass them with 'secrets: inherit' (see docs/consuming.md)."
+            exit 1
+          fi
+
+      - name: Check out the PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      # The CLI version lives in THIS repo's package.json so Dependabot bumps it
+      # (each bump releases, and consumers receive it with their pin bump).
+      # Read it at this workflow's own pinned SHA, then remove the checkout so
+      # it is not inside the project tree `vercel build` sees.
+      - name: Check out vercel-preview-ci (its own pinned SHA)
+        if: inputs.vercel-version == ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: _vercel-preview-ci
+          sparse-checkout: package.json
+          sparse-checkout-cone-mode: false
+
+      - name: Resolve the Vercel CLI version
+        id: cli
+        env:
+          OVERRIDE: ${{ inputs.vercel-version }}
+        run: |
+          set -euo pipefail
+          if [ -n "$OVERRIDE" ]; then
+            version="$OVERRIDE"
+          else
+            version=$(node -p "require('./_vercel-preview-ci/package.json').dependencies.vercel")
+            rm -rf _vercel-preview-ci
+          fi
+          if ! printf '%s' "$version" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Vercel CLI version must be an exact x.y.z, got '$version'."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      # `vercel build` runs the project's install command, so the consumer's
+      # package manager must be on PATH. A pnpm consumer gets the pnpm its
+      # package.json `packageManager` pins; npm ships with Node.
+      - name: Set up pnpm
+        if: hashFiles('pnpm-lock.yaml') != ''
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: ${{ hashFiles('pnpm-lock.yaml') != '' && 'pnpm' || '' }}
+
+      - name: Install the Vercel CLI
+        env:
+          VERSION: ${{ steps.cli.outputs.version }}
+        run: npm install --global "vercel@$VERSION"
+
+      - name: Pull the Vercel preview environment
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        # --git-branch selects branch-scoped preview variables, matching what a
+        # Git-integration preview of this branch would have received.
+        run: vercel pull --yes --environment=preview --git-branch="$HEAD_REF" --token="$VERCEL_TOKEN"
+
+      - name: Build
+        env:
+          # What a consumer's .npmrc interpolates to reach a scoped registry
+          # (GitHub Packages). Inert when the consumer has no .npmrc.
+          NODE_AUTH_TOKEN: ${{ github.token }}
+        run: vercel build --yes --token="$VERCEL_TOKEN"
+
+      # `vercel deploy` prints only the deployment URL on stdout (progress goes
+      # to stderr), so stdout is the contract; validate it before using it.
+      - name: Deploy prebuilt preview
+        id: deploy
+        run: |
+          set -euo pipefail
+          url=$(vercel deploy --prebuilt --yes --token="$VERCEL_TOKEN" | tail -n 1)
+          if ! printf '%s' "$url" | grep -qE '^https://[^[:space:]]+$'; then
+            echo "::error::Could not read a deployment URL from 'vercel deploy' (got '$url')."
+            exit 1
+          fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Preview deployed to: $url" >> "$GITHUB_STEP_SUMMARY"
+
+      # One comment per PR, found by its marker and edited in place. The marker
+      # matches the one the per-repo workflows used, so a migrating repo's
+      # existing comment is reused rather than duplicated.
+      - name: Post or update the sticky PR comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          URL: ${{ steps.deploy.outputs.url }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          marker='<!-- vercel-preview-bot -->'
+          body="$marker
+          🔺 **Vercel preview** for commit \`${SHA:0:7}\`:
+
+          $URL"
+          # --paginate runs --jq once per page, so take the first id overall.
+          existing=$(gh api --paginate "repos/$REPO/issues/$PR/comments?per_page=100" \
+            --jq ".[] | select(.body | startswith(\"$marker\")) | .id" | head -n 1)
+          if [ -n "$existing" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$existing" -f body="$body" > /dev/null
+          else
+            gh api -X POST "repos/$REPO/issues/$PR/comments" -f body="$body" > /dev/null
+          fi

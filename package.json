@@ -1,0 +1,43 @@
+{
+  "name": "@rmartz/vercel-preview-ci",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Label-driven Vercel preview deploys for the fleet's Vercel-hosted repos: a reusable workflow that deploys a preview with the Vercel CLI only when a PR is marked UAT ready, kept current in consumers by Dependabot.",
+  "keywords": [
+    "ci",
+    "vercel",
+    "preview",
+    "uat",
+    "github-actions",
+    "reusable-workflow"
+  ],
+  "homepage": "https://github.com/rmartz/vercel-preview-ci#readme",
+  "bugs": {
+    "url": "https://github.com/rmartz/vercel-preview-ci/issues"
+  },
+  "type": "module",
+  "packageManager": "pnpm@10.30.3",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rmartz/vercel-preview-ci.git"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "vercel": "62.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.3",
+    "prettier": "3.9.9",
+    "typescript": "6.0.3",
+    "vitest": "5.0.3",
+    "yaml": "2.9.1"
+  }
+}
