@@ -1,0 +1,31 @@
+name: Repo Hygiene
+
+# Consumes @rmartz/repo-hygiene through its composite Action, the caller shape
+# every consuming repo uses. The Action scans the workspace, so the job checks it
+# out first; the checks are tree-based, so no `fetch-depth: 0`. The `@<sha>` pin
+# is kept current by Dependabot's github-actions ecosystem, so new check logic
+# arrives with no edit here.
+#
+# The checks are named explicitly (rather than taking the default-on set) so OKF
+# docs conformance, docs-link integrity, AGENTS/CLAUDE pairing, and file-size caps
+# are gated alongside package-pins; configured in .repo-hygiene.yml.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  statuses: write # one `repo-hygiene / <check>` commit status per check
+
+jobs:
+  hygiene:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: rmartz/repo-hygiene-action@3bc251cc227c72370dabd3c2ea859d70c3d98321 # v4.0.0
+        with:
+          checks: conflict-markers action-pins action-pin-tags package-pins docs-links md-pairing okf okf-index file-caps
+          config: .repo-hygiene.yml

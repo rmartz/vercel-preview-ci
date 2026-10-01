@@ -1,0 +1,9 @@
+# actionlint configuration (the Lint job in ci.yml).
+paths:
+  .github/workflows/vercel-preview.yml:
+    ignore:
+      # `job.workflow_repository` / `job.workflow_sha` are real GitHub contexts
+      # (a reusable workflow reading its own repo at its own pinned SHA; also
+      # used by rmartz/storybook-ci) that actionlint 1.7.12 does not model yet.
+      # Drop this once actionlint knows them.
+      - 'property "workflow_(repository|sha)" is not defined in object type'

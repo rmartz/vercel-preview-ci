@@ -1,0 +1,35 @@
+name: Release
+
+# Automatic releases, tag-as-source-of-truth, run by the fleet's shared release
+# workflow (rmartz/semantic-release-ci). On every push to main it analyzes the
+# conventional-commit subjects since the last vX.Y.Z tag, computes the next
+# version, and creates the git tag + GitHub Release. The release toolchain
+# (semantic-release, its plugins and the changelog preset) lives in
+# semantic-release-ci, where a toolchain bump is tested before it reaches this
+# pin; the options stay here in .releaserc.json.
+#
+# This repo is UNPUBLISHED: there is deliberately NO @semantic-release/npm
+# plugin (see .releaserc.json) and package.json stays a `private` `0.0.0`
+# placeholder. The release exists purely so Dependabot's github-actions
+# ecosystem can bump the `@<sha>` pin consumers put on the reusable workflow:
+# each vX.Y.Z tag is a bumpable ref. Only the built-in GITHUB_TOKEN is used — no
+# PAT, no commit-back to a protected branch.
+#
+# Version mapping is standard SemVer from the conventionalcommits preset: feat →
+# minor, fix/perf → patch, a breaking `!` → major. The first release cuts v1.0.0,
+# so this is a 1.x line with no pre-1.0 cap.
+
+on:
+  push:
+    branches: [main]
+
+# The shared workflow declares no permissions of its own; it runs with these.
+# Releases are serialized per repository inside it.
+permissions:
+  contents: write # create tags and GitHub releases
+  issues: write # semantic-release comments on released issues
+  pull-requests: write # semantic-release comments on released PRs
+
+jobs:
+  release:
+    uses: rmartz/semantic-release-ci/.github/workflows/semantic-release.yml@55b1f6145b85738f94ad87c12c9d4f41ab7818b4 # v2.0.0
