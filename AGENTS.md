@@ -78,6 +78,9 @@ and **self-manages** its config. Fix conformance gaps directly here, in a PR.
 - **Safe bot merge:** [`merge-safety.yml`](.github/workflows/merge-safety.yml)
   (required check `merge-safety`) and
   [`bot-automerge.yml`](.github/workflows/bot-automerge.yml).
+- **PR policy:** [`pr-policy.yml`](.github/workflows/pr-policy.yml) runs the
+  shared `rmartz/pr-policy-action` checks on every PR and posts the `pr-policy`
+  verdict. It passes `skip-uat: true` because the repo has nothing to user-test.
 - **CI** ([ci.yml](.github/workflows/ci.yml)): Typecheck, Lint (actionlint,
   which also runs shellcheck on every `run:` block), Format, and Test, plus the
   PR-title lint and the post-merge commit-convention tripwire.
@@ -123,7 +126,7 @@ Before pushing, run `ai-pre-push-verify -C <worktree>` and fix every failure.
   ships to consumers, so it takes a releasing type (`feat:` / `fix:` / `perf:`),
   never `ci:`, which cuts no release. `ci:` is for this repo's **own** CI:
   `ci.yml`, `release*.yml`, `repo-hygiene.yml`, `merge-safety.yml`,
-  `bot-automerge.yml`, the PR-title lint, the tripwire, and
+  `bot-automerge.yml`, `pr-policy.yml`, the PR-title lint, the tripwire, and
   `.github/actions/setup`.
 
 ## Agent directive files
