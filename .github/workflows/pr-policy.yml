@@ -12,10 +12,24 @@ name: pr-policy
 # pull_request_target is safe here only because nothing checks out or runs the
 # PR's code; the Action reads everything through the API. It is needed so fork
 # and Dependabot PRs still get a write token for the check-run, status, and label.
+#
+# ready_for_review / converted_to_draft: the title check blocks a WIP-marked title
+# only on a PR that isn't a draft, so a draft/ready flip must re-run it. Without
+# them, a `[WIP]` draft marked ready keeps its stale green verdict.
 
 on:
   pull_request_target:
-    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
+    types:
+      [
+        opened,
+        synchronize,
+        reopened,
+        edited,
+        labeled,
+        unlabeled,
+        ready_for_review,
+        converted_to_draft,
+      ]
 
 permissions:
   checks: write # post the pr-policy check-run
