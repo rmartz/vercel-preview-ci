@@ -1,7 +1,7 @@
 ---
 type: Reference
 title: Adopting vercel-preview-ci in a consuming repo
-description: The caller workflow, the secrets and permissions it needs, the inputs and output, keeping the pin current with Dependabot, and the checklist for migrating a repo off its own preview-deploy.yml and Ignored Build Step script.
+description: The caller workflow, the secrets and permissions it needs, the inputs and outputs, the optional stable UAT hostname, keeping the pin current with Dependabot, and the checklist for migrating a repo off its own preview-deploy.yml and Ignored Build Step script.
 tags: [vercel, preview, consuming, migration, dependabot]
 ---
 
@@ -127,8 +127,8 @@ How the alias moves:
   last preview, the same as the preview itself (see
   [The deploy gate](gating.md#which-events-deploy)).
 
-The value must be a bare hostname, without a scheme or path. The job fails
-before aliasing otherwise.
+The value must be a bare hostname, without a scheme or path. Otherwise the job
+fails at its first steps, before the build.
 
 ## How the build runs
 

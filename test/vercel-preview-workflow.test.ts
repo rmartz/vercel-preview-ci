@@ -205,8 +205,39 @@ describe('vercel-preview.yml alias-domain', () => {
     expect(alias?.run).not.toContain('${{');
   });
 
-  it('rejects a value that is not a bare hostname', () => {
-    expect(alias?.run).toContain('::error::');
+  describe('the hostname check', () => {
+    const check = stepNamed('Check the alias domain');
+    // The ERE the step passes to `grep -qE`; this pattern is also valid JS.
+    const pattern = /grep -qE '([^']+)'/.exec(check?.run ?? '')?.[1] ?? '';
+    const isAccepted = (value: string) => new RegExp(pattern).test(value);
+
+    it('runs before the build, only when the input is set', () => {
+      expect(check?.if).toBe("inputs.alias-domain != ''");
+      expect(check?.env?.ALIAS_DOMAIN).toBe('${{ inputs.alias-domain }}');
+      expect(check?.run).toContain('<<< "$ALIAS_DOMAIN"');
+      expect(check?.run).toContain('::error::');
+      expect(stepIndex('Check the alias domain')).toBeLessThan(stepIndex('Build'));
+    });
+
+    it.each(['staging.example.com', 'a-b.c.dev', 'Staging.Budget.reedmartz.dev'])(
+      'accepts %s',
+      (value) => {
+        expect(isAccepted(value)).toBe(true);
+      },
+    );
+
+    it.each([
+      'https://staging.example.com',
+      'staging.example.com/path',
+      'staging.example.com.',
+      'localhost',
+      '-bad.example.com',
+      'bad-.example.com',
+      'two words.example.com',
+      '',
+    ])('rejects %j', (value) => {
+      expect(isAccepted(value)).toBe(false);
+    });
   });
 
   it('exposes the alias URL as a job output and names it in the summary and comment', () => {

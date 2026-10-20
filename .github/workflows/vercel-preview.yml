@@ -130,6 +130,19 @@ jobs:
             exit 1
           fi
 
+      # Likewise for a malformed alias-domain: fail here, not after a full build
+      # and deploy.
+      - name: Check the alias domain
+        if: inputs.alias-domain != ''
+        env:
+          ALIAS_DOMAIN: ${{ inputs.alias-domain }}
+        run: |
+          set -euo pipefail
+          if ! grep -qE '^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$' <<< "$ALIAS_DOMAIN"; then
+            echo "::error::alias-domain must be a bare hostname such as staging.example.com, got '$ALIAS_DOMAIN'."
+            exit 1
+          fi
+
       - name: Check out the PR head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -225,10 +238,6 @@ jobs:
           URL: ${{ steps.deploy.outputs.url }}
         run: |
           set -euo pipefail
-          if ! grep -qE '^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$' <<< "$ALIAS_DOMAIN"; then
-            echo "::error::alias-domain must be a bare hostname such as staging.example.com, got '$ALIAS_DOMAIN'."
-            exit 1
-          fi
           vercel alias set "$URL" "$ALIAS_DOMAIN" --token="$VERCEL_TOKEN"
           echo "url=https://$ALIAS_DOMAIN" >> "$GITHUB_OUTPUT"
           echo "Aliased to: https://$ALIAS_DOMAIN" >> "$GITHUB_STEP_SUMMARY"
