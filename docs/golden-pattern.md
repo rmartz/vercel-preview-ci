@@ -109,16 +109,21 @@ repository Actions secrets (see [Secrets](consuming.md#secrets)).
 
 Use the CNAME target Vercel shows for each domain.
 
+**Git:**
+
+- [ ] Push a placeholder branch (for example `staging`), cut from the default
+      branch and never committed to. Vercel's domain settings accept only a
+      branch that exists in the connected repo. It never deploys, because the
+      `vercel.json` above limits Git deploys to the default branch.
+
 **Vercel**, in the project's **Settings → Domains**:
 
 - [ ] Add the production host as a production domain.
 - [ ] Add `staging.example.com` and `*.preview.example.com`, and **assign both
-      to a placeholder Git branch that is never deployed** (for example
-      `staging`). The workflows alias these hosts to deployments directly, so
-      the branch never needs to exist. Vercel rejects the production branch as
-      a domain's branch, and a domain left unassigned is a production domain:
-      production deploys take it back, and it skips preview deployment
-      protection.
+      to the placeholder branch**. The workflows alias these hosts to
+      deployments directly. Vercel rejects the production branch as a domain's
+      branch, and a domain left unassigned is a production domain: production
+      deploys take it back, and it skips preview deployment protection.
 - [ ] Wait until each domain shows as verified with a certificate.
 
 **Allowlists:** add the production, staging and preview hosts to each auth
