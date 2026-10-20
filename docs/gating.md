@@ -34,7 +34,9 @@ each one only in the cases where a new preview is useful:
 
 Removing the UAT label does **not** delete an existing preview. The PR simply
 stops being redeployed, and the sticky comment keeps pointing at the last
-preview.
+preview. If the consumer sets `alias-domain` and this PR holds the alias, the
+alias also keeps pointing at that preview until another PR deploys (see
+[A stable UAT hostname](consuming.md#a-stable-uat-hostname)).
 
 ## The label rename
 

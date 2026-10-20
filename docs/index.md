@@ -10,7 +10,8 @@ deploy, written in [Open Knowledge Format](okf-format.md).
 - [What vercel-preview-ci is](overview.md): why previews are gated on a UAT
   label, and the per-repo variants this replaces.
 - [Adopting it in a consuming repo](consuming.md): the caller workflow, secrets,
-  permissions, inputs and output, and the migration checklist.
+  permissions, inputs and outputs, the optional stable UAT hostname, and the
+  migration checklist.
 - [The deploy gate](gating.md): exactly which events deploy, the label rename,
   and per-PR concurrency.
 - [Disabling Git-integration previews](disabling-git-previews.md): the
