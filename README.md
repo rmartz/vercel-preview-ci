@@ -16,6 +16,14 @@ UAT**:
 
 Production is unchanged. Vercel's Git integration keeps deploying `main`.
 
+## Recommended setup: the golden pattern
+
+The supported way to consume this repo is
+**[the golden pattern](docs/golden-pattern.md)**: production, staging and
+per-PR UAT previews, each on a host you own, on any Vercel plan. It has
+copy-paste callers for both workflows and a DNS and Vercel checklist. The
+quickstart below is its minimal subset, previews only.
+
 ## Quickstart
 
 1. Add `.github/workflows/preview-deploy.yml`:
@@ -73,10 +81,19 @@ Add the domain to the Vercel project first. See
 The full walkthrough, including migrating off a per-repo `preview-deploy.yml` and
 `vercel-ignore-build.*` script, is in [docs/consuming.md](docs/consuming.md).
 
+## Staging
+
+A second reusable workflow, `vercel-staging.yml`, deploys the default branch
+with the Preview environment variables on each push, and aliases it to a
+staging hostname. With production and PR previews that gives three tiers, all on
+the Hobby plan. See [docs/staging.md](docs/staging.md).
+
 ## Documentation
 
+- [The golden pattern](docs/golden-pattern.md) (recommended setup)
 - [What vercel-preview-ci is](docs/overview.md)
 - [Adopting it in a consuming repo](docs/consuming.md)
+- [A staging deploy of the default branch](docs/staging.md)
 - [The deploy gate](docs/gating.md)
 - [Disabling Git-integration previews](docs/disabling-git-previews.md)
 - [Design decisions](docs/decisions.md)

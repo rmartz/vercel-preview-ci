@@ -1,0 +1,235 @@
+name: Vercel Staging (reusable)
+
+# Staging deploy for a consuming repo: the default branch's code, built with the
+# Vercel project's Preview environment variables, aliased to a stable staging
+# hostname. Together with Vercel's own production deploys and vercel-preview.yml
+# this gives three tiers, all on the Hobby plan (docs/staging.md):
+#
+#   Production  main code + Production env   Vercel Git integration
+#   Staging     main code + Preview env      this workflow
+#   Preview     PR code   + Preview env      vercel-preview.yml
+#
+# The consumer's caller (see docs/staging.md):
+#
+#   on:
+#     push:
+#       branches: [main]
+#     workflow_dispatch:
+#   jobs:
+#     staging:
+#       uses: rmartz/vercel-preview-ci/.github/workflows/vercel-staging.yml@<sha>  # vX.Y.Z
+#       with:
+#         alias-domain: staging.example.com
+#       secrets: inherit   # VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
+#
+# The setup steps mirror vercel-preview.yml. They are inlined rather than shared
+# through a local action, because a reusable workflow's `uses: ./…` resolves
+# against the caller's checkout, not this repo's.
+
+on:
+  workflow_call:
+    inputs:
+      alias-domain:
+        description: >-
+          Stable staging hostname you own (e.g. staging.example.com), added to
+          the Vercel project's domains. Each successful deploy points it at the
+          new staging deployment.
+        type: string
+        required: true
+      node-version:
+        description: 'Node.js version for the build. Match the Vercel project setting.'
+        type: string
+        required: false
+        default: 24.x
+      vercel-version:
+        description: >-
+          Exact Vercel CLI version. Leave empty (recommended) to use the version
+          pinned in this repo's package.json, which Dependabot keeps current.
+        type: string
+        required: false
+        default: ''
+      timeout-minutes:
+        description: 'Backstop job timeout. Size it from the measured build time; do not just raise it.'
+        type: number
+        required: false
+        default: 10
+    outputs:
+      url:
+        description: 'The staging deployment URL. Empty when the gate skipped the deploy.'
+        value: ${{ jobs.deploy.outputs.url }}
+      alias-url:
+        description: 'https://<alias-domain> once it points at this deployment. Empty when the gate skipped the deploy.'
+        value: ${{ jobs.deploy.outputs.alias-url }}
+    secrets:
+      VERCEL_TOKEN:
+        description: 'Vercel access token scoped to the project team.'
+        required: false
+      VERCEL_ORG_ID:
+        description: 'Vercel team (org) id: `orgId` in .vercel/project.json.'
+        required: false
+      VERCEL_PROJECT_ID:
+        description: 'Vercel project id: `projectId` in .vercel/project.json.'
+        required: false
+
+# A called workflow can only narrow the caller's grant, never widen it, so the
+# caller must grant these too (docs/staging.md). `packages: read` lets the job
+# token resolve same-owner GitHub Packages for a consumer whose .npmrc scopes
+# one. There is no PR, so no comment and no `pull-requests` scope.
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  deploy:
+    name: Deploy staging
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    # The gate (docs/staging.md):
+    #  - a push, or a manual dispatch, only. Never a pull_request: staging is
+    #    the default branch's code, not a PR's.
+    #  - on the repository's default branch only, so a push to any other branch
+    #    never replaces staging.
+    #  - never in a fork, so a fork's pushes never deploy over this project.
+    if: >-
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+      && !github.event.repository.fork
+    # One staging per repo, job-level: the newest default-branch commit cancels
+    # an older in-flight deploy, and an event the gate skips never joins the
+    # group.
+    concurrency:
+      group: vercel-staging-${{ github.repository }}
+      cancel-in-progress: true
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+      alias-url: ${{ steps.alias.outputs.url }}
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_TELEMETRY_DISABLED: '1'
+    steps:
+      # Fail with a clear message rather than an opaque CLI auth error.
+      - name: Check Vercel secrets
+        run: |
+          set -euo pipefail
+          missing=""
+          for name in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!name}" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing secret(s):$missing. Pass them with 'secrets: inherit' (see docs/staging.md)."
+            exit 1
+          fi
+
+      # Likewise for a malformed alias-domain: fail here, not after a full build
+      # and deploy.
+      - name: Check the alias domain
+        env:
+          ALIAS_DOMAIN: ${{ inputs.alias-domain }}
+        run: |
+          set -euo pipefail
+          if ! grep -qE '^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$' <<< "$ALIAS_DOMAIN"; then
+            echo "::error::alias-domain must be a bare hostname such as staging.example.com, got '$ALIAS_DOMAIN'."
+            exit 1
+          fi
+
+      - name: Check out the default branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+
+      # The CLI version lives in THIS repo's package.json so Dependabot bumps it
+      # (each bump releases, and consumers receive it with their pin bump).
+      # Read it at this workflow's own pinned SHA, then remove the checkout so
+      # it is not inside the project tree `vercel build` sees.
+      - name: Check out vercel-preview-ci (its own pinned SHA)
+        if: inputs.vercel-version == ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: _vercel-preview-ci
+          sparse-checkout: package.json
+          sparse-checkout-cone-mode: false
+
+      - name: Resolve the Vercel CLI version
+        id: cli
+        env:
+          OVERRIDE: ${{ inputs.vercel-version }}
+        run: |
+          set -euo pipefail
+          if [ -n "$OVERRIDE" ]; then
+            version="$OVERRIDE"
+          else
+            version=$(node -p "require('./_vercel-preview-ci/package.json').dependencies.vercel")
+            rm -rf _vercel-preview-ci
+          fi
+          if ! grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$' <<< "$version"; then
+            echo "::error::Vercel CLI version must be an exact x.y.z, got '$version'."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      # `vercel build` runs the project's install command, so the consumer's
+      # package manager must be on PATH. A pnpm consumer gets the pnpm its
+      # package.json `packageManager` pins; npm ships with Node.
+      - name: Set up pnpm
+        if: hashFiles('pnpm-lock.yaml') != ''
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: ${{ hashFiles('pnpm-lock.yaml') != '' && 'pnpm' || '' }}
+
+      - name: Install the Vercel CLI
+        env:
+          VERSION: ${{ steps.cli.outputs.version }}
+        run: npm install --global "vercel@$VERSION"
+
+      # The Preview environment, not Production: staging differs from
+      # production only in its variables. --git-branch selects any variables
+      # the consumer scoped to the default branch.
+      - name: Pull the Vercel preview environment
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: vercel pull --yes --environment=preview --git-branch="$DEFAULT_BRANCH" --token="$VERCEL_TOKEN"
+
+      - name: Build
+        env:
+          # What a consumer's .npmrc interpolates to reach a scoped registry
+          # (GitHub Packages). Inert when the consumer has no .npmrc.
+          NODE_AUTH_TOKEN: ${{ github.token }}
+        run: vercel build --yes --token="$VERCEL_TOKEN"
+
+      # No --prod: this is a preview deployment, so it never touches the
+      # production domains. `vercel deploy` prints only the deployment URL on
+      # stdout (progress goes to stderr), so stdout is the contract; validate
+      # it before using it.
+      - name: Deploy prebuilt staging
+        id: deploy
+        run: |
+          set -euo pipefail
+          url=$(vercel deploy --prebuilt --yes --token="$VERCEL_TOKEN" | tail -n 1)
+          if ! grep -qE '^https://[^[:space:]]+$' <<< "$url"; then
+            echo "::error::Could not read a deployment URL from 'vercel deploy' (got '$url')."
+            exit 1
+          fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Staging deployed to: $url" >> "$GITHUB_STEP_SUMMARY"
+
+      # The token goes only through --token, as for `vercel pull` and `vercel
+      # deploy`; the team scope comes from the .vercel/project.json `vercel
+      # pull` wrote.
+      - name: Alias the deployment to the staging domain
+        id: alias
+        env:
+          ALIAS_DOMAIN: ${{ inputs.alias-domain }}
+          URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          set -euo pipefail
+          vercel alias set "$URL" "$ALIAS_DOMAIN" --token="$VERCEL_TOKEN"
+          echo "url=https://$ALIAS_DOMAIN" >> "$GITHUB_OUTPUT"
+          echo "Aliased to: https://$ALIAS_DOMAIN" >> "$GITHUB_STEP_SUMMARY"
