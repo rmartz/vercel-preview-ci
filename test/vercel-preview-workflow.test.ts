@@ -246,6 +246,22 @@ describe('vercel-preview.yml alias-domain', () => {
     expect(comment?.env?.ALIAS_URL).toBe('${{ steps.alias.outputs.url }}');
     expect(comment?.run).toContain('$ALIAS_URL');
   });
+
+  // Allowlists accept the alias host, not vercel.app, so it is the link to
+  // open; the immutable deployment URL stays as a secondary line.
+  it('leads the comment with the alias URL and demotes the deployment URL', () => {
+    const run = comment?.run ?? '';
+    const withAlias = /if \[ -n "\$ALIAS_URL" \]; then([\s\S]*?)\n\s*else\n/.exec(run)?.[1] ?? '';
+    expect(withAlias).toContain('body="$marker');
+    expect(withAlias).toContain('$ALIAS_URL');
+    expect(withAlias).toContain('Deployment: $URL');
+    expect(withAlias.indexOf('$ALIAS_URL')).toBeLessThan(withAlias.indexOf('Deployment: $URL'));
+  });
+
+  // A per-PR host (built from the PR number) is never taken by another PR.
+  it('does not claim another PR will take the alias', () => {
+    expect(comment?.run).not.toContain('until another PR');
+  });
 });
 
 describe('package.json Vercel CLI pin', () => {

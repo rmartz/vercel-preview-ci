@@ -56,7 +56,8 @@ Production is unchanged. Vercel's Git integration keeps deploying `main`.
 Set `alias-domain` to a hostname you own, and each UAT deploy points it at the
 new preview. Testers keep one URL for "whatever is in UAT now", and allowlists
 (OAuth redirect URIs, Firebase authorized domains) can name that one host
-instead of all of `vercel.app`. Nothing changes when the input is unset.
+instead of all of `vercel.app`. The sticky comment then leads with that host.
+Nothing changes when the input is unset.
 
 ```yaml
 jobs:
@@ -67,7 +68,16 @@ jobs:
     secrets: inherit
 ```
 
-Add the domain to the Vercel project first. See
+For one host per PR, so several PRs can sit in UAT at once, build it from the PR
+number:
+
+```yaml
+alias-domain: pr-${{ github.event.pull_request.number }}.preview.example.com
+```
+
+Add the domain to the Vercel project first, assigned to a never-deployed
+placeholder branch. Left unassigned, it is a production domain that `main`
+deploys take back. See
 [A stable UAT hostname](docs/consuming.md#a-stable-uat-hostname).
 
 The full walkthrough, including migrating off a per-repo `preview-deploy.yml` and

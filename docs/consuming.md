@@ -97,8 +97,11 @@ one-PR-at-a-time UAT flow without Vercel's paid Preview Deployment Suffix, and
 works on the Hobby plan.
 
 1. Add the domain to the Vercel project (**Settings → Domains**) and create the
-   DNS record Vercel asks for. Do not assign it to a branch or environment; the
-   workflow points it at a deployment directly.
+   DNS record Vercel asks for. **Assign it to a placeholder Git branch that is
+   never deployed** (for example `uat-alias`). A project domain left unassigned
+   is a production domain: every `main` deploy takes it back, and it skips
+   preview deployment protection. The workflow points it at a deployment
+   directly, so the placeholder branch never needs to exist.
 2. Pass it to the workflow:
 
    ```yaml
@@ -112,23 +115,42 @@ works on the Hobby plan.
 
 After each successful deploy the workflow runs
 `vercel alias set <preview-url> <alias-domain>` with the same `--token` as the
-deploy. The URL appears in the job summary, the `alias-url` output, and the
-sticky comment, which says that this PR holds the alias.
+deploy. The alias URL appears in the job summary, the `alias-url` output, and
+the sticky comment. The comment leads with the alias URL and lists the raw
+`*.vercel.app` URL below it as `Deployment:`.
 
-How the alias moves:
+How a fixed alias moves:
 
 - **The last PR deployed holds it.** Each UAT deploy (labelling, a new push to a
   labelled PR) takes the alias from whichever PR had it. Deploys of different
   PRs are not serialized, so when two finish close together, the later one wins.
-- **An older PR's comment is not edited.** It still shows the alias line from
-  when it held it. The comment on the PR that deployed most recently is the
-  current one.
+- **An older PR's comment is not edited.** Its alias link now opens whichever PR
+  deployed last. Its `Deployment:` URL still opens its own preview.
 - **Removing the UAT label leaves the alias where it is,** pointing at that PR's
   last preview, the same as the preview itself (see
   [The deploy gate](gating.md#which-events-deploy)).
 
 The value must be a bare hostname, without a scheme or path. Otherwise the job
 fails at its first steps, before the build.
+
+### One hostname per PR
+
+To let several PRs sit in UAT at once, build the host from the PR number. Each
+PR then keeps its own alias, and its comment link never moves to another PR:
+
+```yaml
+jobs:
+  preview:
+    uses: rmartz/vercel-preview-ci/.github/workflows/vercel-preview.yml@<sha> # vX.Y.Z
+    with:
+      alias-domain: pr-${{ github.event.pull_request.number }}.preview.example.com
+    secrets: inherit
+```
+
+Vercel must be able to serve every such host, typically through a wildcard
+domain (`*.preview.example.com`, which needs Vercel's nameservers), assigned to
+the placeholder branch as above. An allowlist then names the wildcard, or each
+host, depending on what the service accepts.
 
 ## How the build runs
 
