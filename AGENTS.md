@@ -75,9 +75,13 @@ and **self-manages** its config. Fix conformance gaps directly here, in a PR.
 
 - **Hygiene** comes from the [`repo-hygiene.yml`](.github/workflows/repo-hygiene.yml)
   caller, configured in [`.repo-hygiene.yml`](.repo-hygiene.yml).
-- **Safe bot merge:** [`merge-safety.yml`](.github/workflows/merge-safety.yml)
-  (required check `merge-safety`) and
-  [`bot-automerge.yml`](.github/workflows/bot-automerge.yml).
+- **PR lifecycle and auto-merge:** [`pr-lifecycle.yml`](.github/workflows/pr-lifecycle.yml)
+  runs the shared `rmartz/pr-lifecycle-action`. It converges each PR's
+  lifecycle labels and arms native auto-merge only once the PR is `approved`
+  (eligible Dependabot and release-please PRs included). The ruleset requires no
+  approving review, so this is the approval gate for automated merges.
+- **Safe merge:** [`merge-safety.yml`](.github/workflows/merge-safety.yml)
+  (required check `merge-safety`).
 - **PR policy:** [`pr-policy.yml`](.github/workflows/pr-policy.yml) runs the
   shared `rmartz/pr-policy-action` checks on every PR and posts the `pr-policy`
   verdict. Its `title` check validates PR titles (Conventional Commits). It
@@ -131,7 +135,7 @@ Before pushing, run `ai-pre-push-verify -C <worktree>` and fix every failure.
   ships to consumers, so it takes a releasing type (`feat:` / `fix:` / `perf:`),
   never `ci:`, which cuts no release. `ci:` is for this repo's **own** CI:
   `ci.yml`, `release*.yml`, `repo-hygiene.yml`, `merge-safety.yml`,
-  `bot-automerge.yml`, `pr-policy.yml`, the tripwire, and
+  `pr-lifecycle.yml`, `pr-policy.yml`, the tripwire, and
   `.github/actions/setup`.
 
 ## Agent directive files
