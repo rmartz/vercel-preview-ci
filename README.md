@@ -51,6 +51,25 @@ Production is unchanged. Vercel's Git integration keeps deploying `main`.
 3. Make sure `.github/dependabot.yml` has a `github-actions` entry so the pin
    stays current.
 
+### Optional: a stable UAT hostname
+
+Set `alias-domain` to a hostname you own, and each UAT deploy points it at the
+new preview. Testers keep one URL for "whatever is in UAT now", and allowlists
+(OAuth redirect URIs, Firebase authorized domains) can name that one host
+instead of all of `vercel.app`. Nothing changes when the input is unset.
+
+```yaml
+jobs:
+  preview:
+    uses: rmartz/vercel-preview-ci/.github/workflows/vercel-preview.yml@<sha> # vX.Y.Z
+    with:
+      alias-domain: staging.example.com
+    secrets: inherit
+```
+
+Add the domain to the Vercel project first. See
+[A stable UAT hostname](docs/consuming.md#a-stable-uat-hostname).
+
 The full walkthrough, including migrating off a per-repo `preview-deploy.yml` and
 `vercel-ignore-build.*` script, is in [docs/consuming.md](docs/consuming.md).
 

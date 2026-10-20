@@ -39,10 +39,22 @@ on:
         type: number
         required: false
         default: 10
+      alias-domain:
+        description: >-
+          Optional stable hostname you own (e.g. staging.example.com), added to
+          the Vercel project's domains. Each successful deploy points it at the
+          new preview, so the PR most recently deployed for UAT holds it. Empty
+          (the default) sets no alias.
+        type: string
+        required: false
+        default: ''
     outputs:
       url:
         description: 'The preview deployment URL. Empty when the gate skipped the deploy.'
         value: ${{ jobs.deploy.outputs.url }}
+      alias-url:
+        description: 'https://<alias-domain> once it points at this preview. Empty when no alias was set.'
+        value: ${{ jobs.deploy.outputs.alias-url }}
     secrets:
       VERCEL_TOKEN:
         description: 'Vercel access token scoped to the project team.'
@@ -98,6 +110,7 @@ jobs:
       cancel-in-progress: true
     outputs:
       url: ${{ steps.deploy.outputs.url }}
+      alias-url: ${{ steps.alias.outputs.url }}
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -200,6 +213,26 @@ jobs:
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "Preview deployed to: $url" >> "$GITHUB_STEP_SUMMARY"
 
+      # Point the consumer's stable hostname at this preview. Serial UAT: the
+      # last PR deployed takes the alias from whichever PR held it. The token
+      # goes only through --token, as for `vercel pull` and `vercel deploy`; the
+      # team scope comes from the .vercel/project.json `vercel pull` wrote.
+      - name: Alias the preview to the stable domain
+        id: alias
+        if: inputs.alias-domain != ''
+        env:
+          ALIAS_DOMAIN: ${{ inputs.alias-domain }}
+          URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          set -euo pipefail
+          if ! grep -qE '^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$' <<< "$ALIAS_DOMAIN"; then
+            echo "::error::alias-domain must be a bare hostname such as staging.example.com, got '$ALIAS_DOMAIN'."
+            exit 1
+          fi
+          vercel alias set "$URL" "$ALIAS_DOMAIN" --token="$VERCEL_TOKEN"
+          echo "url=https://$ALIAS_DOMAIN" >> "$GITHUB_OUTPUT"
+          echo "Aliased to: https://$ALIAS_DOMAIN" >> "$GITHUB_STEP_SUMMARY"
+
       # One comment per PR, found by its marker and edited in place. The marker
       # matches the one the per-repo workflows used, so a migrating repo's
       # existing comment is reused rather than duplicated.
@@ -215,6 +248,7 @@ jobs:
           REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
           URL: ${{ steps.deploy.outputs.url }}
+          ALIAS_URL: ${{ steps.alias.outputs.url }}
           SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
@@ -223,6 +257,11 @@ jobs:
           🔺 **Vercel preview** for commit \`${SHA:0:7}\`:
 
           $URL"
+          if [ -n "$ALIAS_URL" ]; then
+            body="$body
+
+          📌 Also at $ALIAS_URL: this PR holds the alias until another PR's preview deploys."
+          fi
           # --paginate runs --jq once per page, so take the first id overall.
           # `sed -n 1p` reads all input, unlike `head`, so gh never takes a
           # SIGPIPE that pipefail would turn into a failure.

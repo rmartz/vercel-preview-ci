@@ -73,9 +73,11 @@ need UAT, so most repos can leave the Dependabot secrets unset.
 | `node-version`    | `24.x`  | Node.js for the build. Match the Vercel project's Node.js setting.                      |
 | `vercel-version`  | `''`    | Exact Vercel CLI version. Empty uses the version pinned in this repo's `package.json`.  |
 | `timeout-minutes` | `10`    | Job timeout. Raise it only after measuring the build, never just to get past a timeout. |
+| `alias-domain`    | `''`    | A hostname you own to point at each new preview. See [below](#a-stable-uat-hostname).   |
 
-The workflow output `url` is the preview URL (empty when the gate skipped). A
-downstream job in the caller can use it, for example for end-to-end tests:
+The workflow output `url` is the preview URL (empty when the gate skipped), and
+`alias-url` is `https://<alias-domain>` (empty when no alias was set). A
+downstream job in the caller can use them, for example for end-to-end tests:
 
 ```yaml
 e2e:
@@ -83,6 +85,50 @@ e2e:
   if: needs.preview.outputs.url != ''
   # ... run tests against ${{ needs.preview.outputs.url }}
 ```
+
+## A stable UAT hostname
+
+`alias-domain` gives the UAT preview one hostname you control, such as
+`staging.example.com`. Testers get one URL for "whatever is in UAT now". A
+service with a domain allowlist (OAuth redirect URIs, Firebase authorized
+domains, Sentry allowed domains) can list that host instead of the `vercel.app`
+parent domain, which would trust every Vercel deployment. It covers the usual
+one-PR-at-a-time UAT flow without Vercel's paid Preview Deployment Suffix, and
+works on the Hobby plan.
+
+1. Add the domain to the Vercel project (**Settings → Domains**) and create the
+   DNS record Vercel asks for. Do not assign it to a branch or environment; the
+   workflow points it at a deployment directly.
+2. Pass it to the workflow:
+
+   ```yaml
+   jobs:
+     preview:
+       uses: rmartz/vercel-preview-ci/.github/workflows/vercel-preview.yml@<sha> # vX.Y.Z
+       with:
+         alias-domain: staging.example.com
+       secrets: inherit
+   ```
+
+After each successful deploy the workflow runs
+`vercel alias set <preview-url> <alias-domain>` with the same `--token` as the
+deploy. The URL appears in the job summary, the `alias-url` output, and the
+sticky comment, which says that this PR holds the alias.
+
+How the alias moves:
+
+- **The last PR deployed holds it.** Each UAT deploy (labelling, a new push to a
+  labelled PR) takes the alias from whichever PR had it. Deploys of different
+  PRs are not serialized, so when two finish close together, the later one wins.
+- **An older PR's comment is not edited.** It still shows the alias line from
+  when it held it. The comment on the PR that deployed most recently is the
+  current one.
+- **Removing the UAT label leaves the alias where it is,** pointing at that PR's
+  last preview, the same as the preview itself (see
+  [The deploy gate](gating.md#which-events-deploy)).
+
+The value must be a bare hostname, without a scheme or path. The job fails
+before aliasing otherwise.
 
 ## How the build runs
 

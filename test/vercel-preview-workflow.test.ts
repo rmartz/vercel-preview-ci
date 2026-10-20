@@ -23,6 +23,7 @@ type Job = {
   if?: string;
   'timeout-minutes'?: string | number;
   concurrency?: { group?: string; 'cancel-in-progress'?: boolean };
+  outputs?: Record<string, string>;
   steps?: Step[];
 };
 type WorkflowCall = {
@@ -78,12 +79,14 @@ describe('vercel-preview.yml public interface', () => {
       'node-version': expect.objectContaining({ type: 'string', required: false, default: '24.x' }),
       'vercel-version': expect.objectContaining({ type: 'string', required: false, default: '' }),
       'timeout-minutes': expect.objectContaining({ type: 'number', required: false, default: 10 }),
+      'alias-domain': expect.objectContaining({ type: 'string', required: false, default: '' }),
     });
   });
 
-  it('exposes the deploy URL as the `url` output', () => {
-    expect(Object.keys(call.outputs ?? {})).toEqual(['url']);
+  it('exposes the deploy URL as the `url` output and the alias as `alias-url`', () => {
+    expect(Object.keys(call.outputs ?? {})).toEqual(['url', 'alias-url']);
     expect(call.outputs?.url?.value).toBe('${{ jobs.deploy.outputs.url }}');
+    expect(call.outputs?.['alias-url']?.value).toBe('${{ jobs.deploy.outputs.alias-url }}');
   });
 
   it('accepts exactly the three Vercel secrets', () => {
@@ -171,6 +174,46 @@ describe('vercel-preview.yml deploy steps', () => {
     ].map(stepIndex);
     expect(order.every((index) => index >= 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
+  });
+});
+
+describe('vercel-preview.yml alias-domain', () => {
+  const alias = stepNamed('Alias the preview to the stable domain');
+  const comment = stepNamed('Post or update the sticky PR comment');
+
+  it('runs only when the input is set, so an unset input changes nothing', () => {
+    expect(alias?.if).toBe("inputs.alias-domain != ''");
+  });
+
+  it('aliases the URL the deploy step produced, after the deploy', () => {
+    expect(alias?.env?.URL).toBe('${{ steps.deploy.outputs.url }}');
+    expect(alias?.run).toContain('vercel alias set "$URL" "$ALIAS_DOMAIN"');
+    expect(stepIndex('Alias the preview to the stable domain')).toBeGreaterThan(
+      stepIndex('Deploy prebuilt preview'),
+    );
+  });
+
+  // Same handling as `vercel pull` / `vercel deploy`: the token reaches the CLI
+  // only through --token, never interpolated into the script.
+  it('passes the token the same way the deploy does', () => {
+    expect(alias?.run).toContain('--token="$VERCEL_TOKEN"');
+    expect(alias?.run).not.toContain('secrets.');
+  });
+
+  it('reads the input through env, never interpolated into the script', () => {
+    expect(alias?.env?.ALIAS_DOMAIN).toBe('${{ inputs.alias-domain }}');
+    expect(alias?.run).not.toContain('${{');
+  });
+
+  it('rejects a value that is not a bare hostname', () => {
+    expect(alias?.run).toContain('::error::');
+  });
+
+  it('exposes the alias URL as a job output and names it in the summary and comment', () => {
+    expect(job.outputs?.['alias-url']).toBe('${{ steps.alias.outputs.url }}');
+    expect(alias?.run).toContain('GITHUB_STEP_SUMMARY');
+    expect(comment?.env?.ALIAS_URL).toBe('${{ steps.alias.outputs.url }}');
+    expect(comment?.run).toContain('$ALIAS_URL');
   });
 });
 
