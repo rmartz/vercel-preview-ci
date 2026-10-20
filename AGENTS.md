@@ -5,7 +5,10 @@ one reusable workflow,
 [`vercel-preview.yml`](.github/workflows/vercel-preview.yml), that a Vercel-hosted
 repo pins by SHA and Dependabot keeps current. The workflow deploys a preview
 with the Vercel CLI only when a PR carries `UAT ready` (or the legacy
-`ready for UAT`). See [README.md](README.md) and the
+`ready for UAT`). A second reusable workflow,
+[`vercel-staging.yml`](.github/workflows/vercel-staging.yml), deploys the
+default branch with Preview variables to a staging alias on each push
+([docs/staging.md](docs/staging.md)). See [README.md](README.md) and the
 [documentation](docs/index.md).
 
 It replaces the per-repo `preview-deploy.yml` copies and
@@ -33,6 +36,9 @@ permissions a caller must grant, the **label names**, and the sticky-comment
 **marker** `<!-- vercel-preview-bot -->`. Renaming or removing any of these is a
 breaking change for every consumer. Add inputs with safe defaults instead of
 repurposing existing ones. Reference: [docs/consuming.md](docs/consuming.md).
+`vercel-staging.yml`'s inputs, outputs, secrets and permissions are public the
+same way ([docs/staging.md](docs/staging.md)), guarded by
+[`test/vercel-staging-workflow.test.ts`](test/vercel-staging-workflow.test.ts).
 
 ## Invariants that must not regress
 
@@ -56,7 +62,8 @@ guards each of these:
 ## Reusable-workflow gotcha: no `./`-local actions across the boundary
 
 A reusable workflow's `uses: ./…` resolves against the **caller's** checkout,
-not this repo's. `vercel-preview.yml` therefore inlines its setup steps.
+not this repo's. `vercel-preview.yml` and `vercel-staging.yml` therefore each
+inline their setup steps.
 `.github/actions/setup` serves this repo's own CI only.
 
 ## Documentation — update it as part of every task
@@ -132,7 +139,8 @@ Before pushing, run `ai-pre-push-verify -C <worktree>` and fix every failure.
 - **Releases are automatic.** `feat:` → minor; `fix:` / `perf:` → patch; a
   breaking `!` → major; other types do not release. The first release is
   `v1.0.0`.
-- **`vercel-preview.yml` is product code, not this repo's CI.** A change to it
+- **`vercel-preview.yml` and `vercel-staging.yml` are product code, not this
+  repo's CI.** A change to either
   ships to consumers, so it takes a releasing type (`feat:` / `fix:` / `perf:`),
   never `ci:`, which cuts no release. `ci:` is for this repo's **own** CI:
   `ci.yml`, `release*.yml`, `repo-hygiene.yml`, `merge-safety.yml`,

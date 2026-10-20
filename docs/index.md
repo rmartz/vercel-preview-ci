@@ -12,6 +12,8 @@ deploy, written in [Open Knowledge Format](okf-format.md).
 - [Adopting it in a consuming repo](consuming.md): the caller workflow, secrets,
   permissions, inputs and outputs, the optional stable UAT hostname, and the
   migration checklist.
+- [A staging deploy of the default branch](staging.md): `vercel-staging.yml`,
+  the production/staging/preview tiers, the caller, and the staging domain.
 - [The deploy gate](gating.md): exactly which events deploy, the label rename,
   and per-PR concurrency.
 - [Disabling Git-integration previews](disabling-git-previews.md): the
