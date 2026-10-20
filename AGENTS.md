@@ -27,6 +27,15 @@ every consumer. That is why a `vercel` bump is a releasing `fix`. Keep it an
 devDependency. Releases exist only so Dependabot can bump the `@<sha>` pins
 consumers hold. **Do not** bump `package.json`'s `version` by hand.
 
+## The golden pattern is the supported setup
+
+The three-tier pattern (production via the Git integration, staging via
+`vercel-staging.yml`, per-PR previews via `vercel-preview.yml`) is the
+supported way to consume this repo. [`docs/golden-pattern.md`](docs/golden-pattern.md)
+is canonical. Any change to either workflow's inputs or behavior must update
+that page and its sync test,
+[`test/golden-pattern.test.ts`](test/golden-pattern.test.ts), in the same PR.
+
 ## The public surface
 
 The consumer-facing contract is the workflow's **inputs**, its `url` and

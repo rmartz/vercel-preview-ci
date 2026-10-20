@@ -7,6 +7,9 @@ okf_version: 0.2
 Documentation for `vercel-preview-ci`, the fleet's label-driven Vercel preview
 deploy, written in [Open Knowledge Format](okf-format.md).
 
+- [The golden pattern](golden-pattern.md): **the supported setup.**
+  Production, staging and per-PR previews on hosts you own, with copy-paste
+  callers and a DNS and Vercel checklist.
 - [What vercel-preview-ci is](overview.md): why previews are gated on a UAT
   label, and the per-repo variants this replaces.
 - [Adopting it in a consuming repo](consuming.md): the caller workflow, secrets,
