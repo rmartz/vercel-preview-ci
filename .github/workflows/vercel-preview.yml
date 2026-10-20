@@ -41,11 +41,12 @@ on:
         default: 10
       alias-domain:
         description: >-
-          Optional hostname you own, added to the Vercel project's domains. Each
-          successful deploy points it at the new preview. A fixed host (e.g.
-          staging.example.com) is held by the PR most recently deployed; a
-          host built from the PR number (e.g. pr-123.preview.example.com) gives
-          each PR its own. The sticky comment leads with it. Empty (the default) sets no alias.
+          Optional per-PR hostname you own, built from the PR number (e.g.
+          pr-123.preview.example.com) under a wildcard domain on the Vercel
+          project; see docs/golden-pattern.md. Each successful deploy points it
+          at the new preview, and the sticky comment leads with it. A stable
+          staging host belongs to vercel-staging.yml instead. Empty (the
+          default) sets no alias.
         type: string
         required: false
         default: ''
@@ -140,7 +141,7 @@ jobs:
         run: |
           set -euo pipefail
           if ! grep -qE '^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$' <<< "$ALIAS_DOMAIN"; then
-            echo "::error::alias-domain must be a bare hostname such as staging.example.com, got '$ALIAS_DOMAIN'."
+            echo "::error::alias-domain must be a bare hostname such as pr-123.preview.example.com, got '$ALIAS_DOMAIN'."
             exit 1
           fi
 
@@ -227,8 +228,7 @@ jobs:
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "Preview deployed to: $url" >> "$GITHUB_STEP_SUMMARY"
 
-      # Point the consumer's hostname at this preview. A fixed host moves to the
-      # last PR deployed; a per-PR host stays with its own PR. The token
+      # Point the consumer's per-PR hostname at this preview. The token
       # goes only through --token, as for `vercel pull` and `vercel deploy`; the
       # team scope comes from the .vercel/project.json `vercel pull` wrote.
       - name: Alias the preview to the stable domain
@@ -263,8 +263,8 @@ jobs:
         run: |
           set -euo pipefail
           marker='<!-- vercel-preview-bot -->'
-          # With an alias, lead with it: it is the host allowlists accept. The
-          # immutable deployment URL stays as a secondary line.
+          # With an alias, lead with it: it is the host auth allowlists accept.
+          # The raw deployment URL stays as a secondary line.
           if [ -n "$ALIAS_URL" ]; then
             body="$marker
           🔺 **Vercel preview** for commit \`${SHA:0:7}\`:

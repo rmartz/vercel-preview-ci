@@ -59,34 +59,27 @@ quickstart below is its minimal subset, previews only.
 3. Make sure `.github/dependabot.yml` has a `github-actions` entry so the pin
    stays current.
 
-### Optional: a stable UAT hostname
+### Optional: a per-PR preview hostname
 
-Set `alias-domain` to a hostname you own, and each UAT deploy points it at the
-new preview. Testers keep one URL for "whatever is in UAT now", and allowlists
-(OAuth redirect URIs, Firebase authorized domains) can name that one host
-instead of all of `vercel.app`. The sticky comment then leads with that host.
-Nothing changes when the input is unset.
+Set `alias-domain` to a host built from the PR number, and each UAT deploy
+points that PR's own host at its new preview. Auth allowlists (OAuth redirect
+URIs, Firebase authorized domains) can then name hosts you own instead of all of
+`vercel.app`, and the sticky comment leads with the PR's host. Nothing changes
+when the input is unset.
 
 ```yaml
 jobs:
   preview:
     uses: rmartz/vercel-preview-ci/.github/workflows/vercel-preview.yml@<sha> # vX.Y.Z
     with:
-      alias-domain: staging.example.com
+      alias-domain: pr-${{ github.event.pull_request.number }}.preview.example.com
     secrets: inherit
 ```
 
-For one host per PR, so several PRs can sit in UAT at once, build it from the PR
-number:
-
-```yaml
-alias-domain: pr-${{ github.event.pull_request.number }}.preview.example.com
-```
-
-Add the domain to the Vercel project first, assigned to a never-deployed
-placeholder branch. Left unassigned, it is a production domain that `main`
-deploys take back. See
-[A stable UAT hostname](docs/consuming.md#a-stable-uat-hostname).
+This needs a wildcard domain (`*.preview.example.com`) on the Vercel project.
+See [A per-PR preview hostname](docs/consuming.md#a-per-pr-preview-hostname) and
+the [golden pattern](docs/golden-pattern.md) checklist. A stable staging host is
+the job of [`vercel-staging.yml`](docs/staging.md), not of the preview workflow.
 
 The full walkthrough, including migrating off a per-repo `preview-deploy.yml` and
 `vercel-ignore-build.*` script, is in [docs/consuming.md](docs/consuming.md).

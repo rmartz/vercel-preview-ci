@@ -100,9 +100,12 @@ checked out:
 2. **Assign it to a placeholder Git branch that is never deployed** (for example
    `staging`). Vercel rejects the production branch as a domain's branch, and a
    domain left unassigned is a production domain: every production deploy takes
-   it back, and it skips preview deployment protection. The workflow aliases the
-   domain to each staging deployment directly, so the placeholder branch never
-   needs to exist.
+   it back, and it skips preview deployment protection. The branch **must exist
+   in the connected repo**, since Vercel's domain settings reject one that
+   doesn't. Push an empty branch cut from the default branch and never commit
+   to it. It never deploys, because Git deploys are limited to the default
+   branch (`git.deploymentEnabled` in `vercel.json`). The workflow aliases the
+   domain to each staging deployment directly.
 
 Because staging is a preview deployment, the project's preview deployment
 protection (for example Vercel Authentication) applies to the staging host too.

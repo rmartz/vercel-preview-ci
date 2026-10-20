@@ -13,7 +13,7 @@ deploy, written in [Open Knowledge Format](okf-format.md).
 - [What vercel-preview-ci is](overview.md): why previews are gated on a UAT
   label, and the per-repo variants this replaces.
 - [Adopting it in a consuming repo](consuming.md): the caller workflow, secrets,
-  permissions, inputs and outputs, the optional stable UAT hostname, and the
+  permissions, inputs and outputs, the optional per-PR preview hostname, and the
   migration checklist.
 - [A staging deploy of the default branch](staging.md): `vercel-staging.yml`,
   the production/staging/preview tiers, the caller, and the staging domain.
