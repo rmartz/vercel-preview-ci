@@ -26,7 +26,8 @@ consumers hold. **Do not** bump `package.json`'s `version` by hand.
 
 ## The public surface
 
-The consumer-facing contract is the workflow's **inputs**, its `url` **output**,
+The consumer-facing contract is the workflow's **inputs**, its `url` and
+`alias-url` **outputs**,
 the three secrets (`VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`), the
 permissions a caller must grant, the **label names**, and the sticky-comment
 **marker** `<!-- vercel-preview-bot -->`. Renaming or removing any of these is a
