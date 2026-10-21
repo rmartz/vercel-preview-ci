@@ -20,11 +20,9 @@ Environments, so it works on the Hobby plan.
 | Staging    | default branch | Preview            | `vercel-staging.yml`, on push                                         |
 | Preview    | a PR's head    | Preview            | `vercel-preview.yml`, on the UAT label ([consuming.md](consuming.md)) |
 
-Staging and PR previews share the Preview environment, so they get the **same
-variables** (for example the same `APP_ENV`). To give staging different values,
-scope those variables in Vercel to the default branch: the workflow pulls with
-`--git-branch=<default branch>`, so branch-scoped Preview variables apply to
-staging only.
+Staging and PR previews share the Preview environment, so by default they get
+the **same variables** (for example the same `APP_ENV`). See
+[Staging-only variables](#staging-only-variables) to give staging its own.
 
 ## The caller
 
@@ -47,6 +45,7 @@ jobs:
     uses: rmartz/vercel-preview-ci/.github/workflows/vercel-staging.yml@<sha> # vX.Y.Z
     with:
       alias-domain: staging.example.com
+      env-branch: staging
     secrets: inherit
 ```
 
@@ -70,12 +69,13 @@ still in flight, and a skipped event never joins the group.
 
 ## Inputs and outputs
 
-| Input             | Default    | Meaning                                                                                 |
-| ----------------- | ---------- | --------------------------------------------------------------------------------------- |
-| `alias-domain`    | (required) | The staging hostname, for example `staging.example.com`. A bare hostname only.          |
-| `node-version`    | `24.x`     | Node.js for the build. Match the Vercel project's Node.js setting.                      |
-| `vercel-version`  | `''`       | Exact Vercel CLI version. Empty uses the version pinned in this repo's `package.json`.  |
-| `timeout-minutes` | `10`       | Job timeout. Raise it only after measuring the build, never just to get past a timeout. |
+| Input             | Default    | Meaning                                                                                                         |
+| ----------------- | ---------- | --------------------------------------------------------------------------------------------------------------- |
+| `alias-domain`    | (required) | The staging hostname, for example `staging.example.com`. A bare hostname only.                                  |
+| `env-branch`      | `''`       | Branch whose Preview variables staging uses. Empty is the default branch. See [below](#staging-only-variables). |
+| `node-version`    | `24.x`     | Node.js for the build. Match the Vercel project's Node.js setting.                                              |
+| `vercel-version`  | `''`       | Exact Vercel CLI version. Empty uses the version pinned in this repo's `package.json`.                          |
+| `timeout-minutes` | `10`       | Job timeout. Raise it only after measuring the build, never just to get past a timeout.                         |
 
 The output `url` is the deployment's `*.vercel.app` URL, and `alias-url` is
 `https://<alias-domain>`. Both are empty when the gate skipped the run, and both
@@ -87,7 +87,9 @@ The build path is the preview workflow's
 ([How the build runs](consuming.md#how-the-build-runs)), with the default branch
 checked out:
 
-1. `vercel pull --environment=preview --git-branch=<default branch>`
+1. `vercel pull --environment=preview --git-branch=<env-branch>`, where
+   `env-branch` falls back to the default branch. The branch used is written to
+   the job summary.
 2. `vercel build`
 3. `vercel deploy --prebuilt`, **without `--prod`**, so it is a preview
    deployment and never touches the production domains.
@@ -109,3 +111,27 @@ checked out:
 
 Because staging is a preview deployment, the project's preview deployment
 protection (for example Vercel Authentication) applies to the staging host too.
+
+## Staging-only variables
+
+To give staging values PR previews don't get (for example
+`NEXT_PUBLIC_APP_ENV=staging`), scope those Preview variables to a branch and
+pass that branch as `env-branch`. The workflow still builds the default branch's
+code. Only the variable selection changes.
+
+The branch can't be the default branch. Vercel refuses a Preview variable
+scoped to the production branch (`Cannot set Production Branch "main" for a
+Preview Environment Variable.`). So the default, an empty `env-branch` that
+falls back to the default branch, can never pick up staging-only values.
+
+Use the placeholder branch from [the staging domain](#the-staging-domain) (for
+example `staging`). It then holds both the staging domain and the staging-only
+variables:
+
+1. In Vercel (**Settings → Environment Variables**), add each staging value to
+   the **Preview** environment, scoped to the `staging` branch.
+2. Pass `env-branch: staging` to the workflow.
+
+Unscoped Preview variables still apply to both staging and PR previews. A
+branch-scoped value overrides the unscoped one for that branch only. The value
+must be a valid Git branch name. Otherwise the job fails before the build.
