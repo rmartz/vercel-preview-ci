@@ -93,19 +93,24 @@ and **self-manages** its config. Fix conformance gaps directly here, in a PR.
 - **Hygiene** comes from the [`repo-hygiene.yml`](.github/workflows/repo-hygiene.yml)
   caller, configured in [`.repo-hygiene.yml`](.repo-hygiene.yml).
 - **PR lifecycle and auto-merge:** [`pr-lifecycle.yml`](.github/workflows/pr-lifecycle.yml)
-  runs the shared `rmartz/pr-lifecycle-action`. It converges each PR's
-  lifecycle labels and arms native auto-merge only once the PR is `approved`
-  (eligible Dependabot and release-please PRs included). The ruleset requires no
-  approving review, so this is the approval gate for automated merges.
+  runs the shared `rmartz/pr-lifecycle-action` with `uat: 'off'`. It converges
+  each PR's lifecycle labels, posts the `pr-lifecycle/sign-off` status pr-policy
+  gates on, and arms native auto-merge only once the PR is `approved` (eligible
+  Dependabot and release-please PRs included). The ruleset requires no approving
+  review, so this is the approval gate for automated merges. Its `token` is a
+  person's PAT (`PR_LIFECYCLE_TOKEN`), since pr-policy trusts the status only
+  from a person; the merge-bot App token does every read and label write.
 - **Safe merge:** [`merge-safety.yml`](.github/workflows/merge-safety.yml)
   (required check `merge-safety`).
 - **PR policy:** [`pr-policy.yml`](.github/workflows/pr-policy.yml) runs the
   shared `rmartz/pr-policy-action` checks on every PR and posts the `pr-policy`
   verdict. Its `title` check validates PR titles (Conventional Commits). It
-  passes `skip-uat: true` because the repo has nothing to user-test. Its trigger
-  includes `ready_for_review` and `converted_to_draft`, because the title check's
-  WIP rule depends on draft state.
-  [`test/pr-policy-workflow.test.ts`](test/pr-policy-workflow.test.ts) guards that.
+  passes `skip-uat: true` because the repo has nothing to user-test (until
+  rmartz/pr-policy#85 retires it). Its trigger includes `ready_for_review` and
+  `converted_to_draft`, because the title check's WIP rule depends on draft
+  state, and `status`, filtered to `pr-lifecycle/sign-off`, so the gate re-runs
+  when pr-lifecycle's classification lands.
+  [`test/pr-policy-workflow.test.ts`](test/pr-policy-workflow.test.ts) guards both.
 - **CI** ([ci.yml](.github/workflows/ci.yml)): Typecheck, Lint (actionlint,
   which also runs shellcheck on every `run:` block), Format, and Test, plus the
   post-merge commit-convention tripwire. PR titles are checked by pr-policy's

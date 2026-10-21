@@ -9,10 +9,14 @@ import { describe, expect, it } from 'vitest';
  * whenever a PR flips between draft and ready unless those events re-run it.
  * Nothing else fails when the trigger list drops them: the stale green verdict
  * just stands, and a WIP-titled PR can merge.
+ *
+ * It also re-runs on pr-lifecycle's `pr-lifecycle/sign-off` commit status, which
+ * the UAT and CI-change checks gate on and which can land after the push's run.
  */
 
 type Workflow = {
-  on?: { pull_request_target?: { types?: string[] } };
+  on?: { pull_request_target?: { types?: string[] }; status?: unknown };
+  jobs?: { 'pr-policy'?: { if?: string } };
 };
 
 const workflow = parse(
@@ -35,6 +39,16 @@ describe('pr-policy.yml triggers', () => {
         'labeled',
         'unlabeled',
       ]),
+    );
+  });
+
+  it('re-runs on a commit status', () => {
+    expect(Object.keys(workflow.on ?? {})).toContain('status');
+  });
+
+  it('runs on a status event only for the pr-lifecycle/sign-off context', () => {
+    expect(workflow.jobs?.['pr-policy']?.if).toBe(
+      "github.event_name != 'status' || github.event.context == 'pr-lifecycle/sign-off'",
     );
   });
 });
