@@ -107,7 +107,7 @@ and **self-manages** its config. Fix conformance gaps directly here, in a PR.
   includes `ready_for_review` and `converted_to_draft`, because the title check's
   WIP rule depends on draft state, and `status`, filtered to
   `pr-lifecycle/sign-off`, so the gate re-runs when pr-lifecycle's sign-off
-  status lands; it trusts that status from `rmartz-merge-bot[bot]`
+  status lands; it trusts that status from `rmartz-pr-lifecycle[bot]`
   (`sign-off-status-creators`).
   [`test/pr-policy-workflow.test.ts`](test/pr-policy-workflow.test.ts) guards both.
 - **CI** ([ci.yml](.github/workflows/ci.yml)): Typecheck, Lint (actionlint,
