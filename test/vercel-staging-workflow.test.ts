@@ -1,4 +1,7 @@
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { parse } from 'yaml';
 import { describe, expect, it } from 'vitest';
@@ -71,6 +74,7 @@ describe('vercel-staging.yml public interface', () => {
   it('keeps the input names, types and defaults', () => {
     expect(call.inputs).toEqual({
       'alias-domain': expect.objectContaining({ type: 'string', required: true }),
+      'env-branch': expect.objectContaining({ type: 'string', required: false, default: '' }),
       'node-version': expect.objectContaining({ type: 'string', required: false, default: '24.x' }),
       'vercel-version': expect.objectContaining({ type: 'string', required: false, default: '' }),
       'timeout-minutes': expect.objectContaining({ type: 'number', required: false, default: 10 }),
@@ -118,11 +122,72 @@ describe('vercel-staging.yml deploy steps', () => {
     expect(stepNamed('Check out the default branch')?.with?.ref).toBe('${{ github.sha }}');
   });
 
-  it('pulls the Preview environment for the default branch', () => {
+  // Only the variable selection follows env-branch; the code stays the default
+  // branch's (the checkout above).
+  it('pulls the Preview environment for the resolved env branch', () => {
     const pull = stepNamed('Pull the Vercel preview environment');
-    expect(pull?.env?.DEFAULT_BRANCH).toBe('${{ github.event.repository.default_branch }}');
+    expect(pull?.env?.ENV_BRANCH).toBe('${{ steps.env-branch.outputs.branch }}');
     expect(pull?.run).toContain('--environment=preview');
-    expect(pull?.run).toContain('--git-branch="$DEFAULT_BRANCH"');
+    expect(pull?.run).toContain('--git-branch="$ENV_BRANCH"');
+  });
+
+  describe('the env branch', () => {
+    const resolve = stepNamed('Resolve the environment branch');
+
+    it('reads the input and default branch through env, before the build', () => {
+      expect(resolve?.env?.ENV_BRANCH).toBe('${{ inputs.env-branch }}');
+      expect(resolve?.env?.DEFAULT_BRANCH).toBe('${{ github.event.repository.default_branch }}');
+      expect(resolve?.run).toContain('GITHUB_STEP_SUMMARY');
+      expect(stepIndex('Resolve the environment branch')).toBeLessThan(stepIndex('Build'));
+    });
+
+    // Run the step's own script, as the runner would, before any checkout.
+    const run = (envBranch: string) => {
+      const dir = mkdtempSync(join(tmpdir(), 'env-branch-'));
+      const output = join(dir, 'output');
+      const summary = join(dir, 'summary');
+      writeFileSync(output, '');
+      writeFileSync(summary, '');
+      const result = spawnSync('bash', ['-c', resolve?.run ?? ''], {
+        cwd: dir,
+        encoding: 'utf8',
+        env: {
+          PATH: process.env.PATH ?? '',
+          ENV_BRANCH: envBranch,
+          DEFAULT_BRANCH: 'main',
+          GITHUB_OUTPUT: output,
+          GITHUB_STEP_SUMMARY: summary,
+        },
+      });
+      return {
+        status: result.status,
+        output: readFileSync(output, 'utf8'),
+        summary: readFileSync(summary, 'utf8'),
+      };
+    };
+
+    it('falls back to the default branch when unset, so existing callers are unchanged', () => {
+      const result = run('');
+      expect(result.status).toBe(0);
+      expect(result.output).toBe('branch=main\n');
+      expect(result.summary).toContain('main');
+    });
+
+    it.each(['staging', 'env/staging'])('accepts %s and writes it to the summary', (branch) => {
+      const result = run(branch);
+      expect(result.status).toBe(0);
+      expect(result.output).toBe(`branch=${branch}\n`);
+      expect(result.summary).toContain(branch);
+    });
+
+    it.each(['two words', '-staging', 'a..b', 'staging.lock', 'refs/heads/x~1'])(
+      'rejects %j before the build',
+      (branch) => {
+        const result = run(branch);
+        expect(result.status).not.toBe(0);
+        expect(result.output).toBe('');
+      },
+    );
   });
 
   it('passes the job token to the build for a consumer private registry', () => {

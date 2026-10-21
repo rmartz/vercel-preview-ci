@@ -90,6 +90,7 @@ jobs:
     uses: rmartz/vercel-preview-ci/.github/workflows/vercel-staging.yml@<sha> # vX.Y.Z
     with:
       alias-domain: staging.example.com
+      env-branch: staging # Preview variables scoped to the placeholder branch
     secrets: inherit # VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
 ```
 
@@ -126,6 +127,13 @@ Use the CNAME target Vercel shows for each domain.
       deploys take it back, and it skips preview deployment protection.
 - [ ] Wait until each domain shows as verified with a certificate.
 
+**Vercel**, in **Settings → Environment Variables**:
+
+- [ ] Add each staging-only value (for example `NEXT_PUBLIC_APP_ENV=staging`) to
+      the **Preview** environment, scoped to the placeholder branch. The staging
+      caller's `env-branch` selects them. See
+      [Staging-only variables](staging.md#staging-only-variables).
+
 **Allowlists:** add the production, staging and preview hosts to each auth
 provider's allowlist.
 
@@ -136,10 +144,12 @@ so both pins stay current.
 
 ## Known limits
 
-- **Staging and previews share the Preview environment,** so APP_ENV-style
-  variables are identical in both. To tell them apart, scope those variables to
-  the default branch in Vercel. The staging workflow pulls with
-  `--git-branch=<default branch>`, so branch-scoped values reach staging only.
+- **Staging and previews share the Preview environment,** so unscoped
+  APP_ENV-style variables are identical in both. Vercel refuses Preview
+  variables scoped to the production branch, so staging-only values go on the
+  placeholder branch instead. Scope them to `staging` in the Preview
+  environment, and the staging caller's `env-branch: staging` picks them up
+  (see [Staging-only variables](staging.md#staging-only-variables)).
 - **Per-PR aliases stay after the PR closes.** The alias keeps pointing at that
   PR's last preview. Cleanup is tracked in
   [rmartz/vercel-preview-ci#4](https://github.com/rmartz/vercel-preview-ci/issues/4).
