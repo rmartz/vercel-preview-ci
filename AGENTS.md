@@ -108,8 +108,11 @@ and **self-manages** its config. Fix conformance gaps directly here, in a PR.
   WIP rule depends on draft state, and `status`, filtered to
   `pr-lifecycle/sign-off`, so the gate re-runs when pr-lifecycle's sign-off
   status lands; it trusts that status from `rmartz-pr-lifecycle[bot]`
-  (`sign-off-status-creators`).
-  [`test/pr-policy-workflow.test.ts`](test/pr-policy-workflow.test.ts) guards both.
+  (the `sign-off-status-creators` default). It sets `require-uat-label: true`, so
+  a PR with no UAT label is held, and re-runs on `workflow_run` when the
+  `pr-lifecycle` workflow completes, since pr-lifecycle writes that label with
+  `GITHUB_TOKEN`, which starts no `labeled` run.
+  [`test/pr-policy-workflow.test.ts`](test/pr-policy-workflow.test.ts) guards these triggers.
 - **CI** ([ci.yml](.github/workflows/ci.yml)): Typecheck, Lint (actionlint,
   which also runs shellcheck on every `run:` block), Format, and Test, plus the
   post-merge commit-convention tripwire. PR titles are checked by pr-policy's

@@ -11,11 +11,17 @@ import { describe, expect, it } from 'vitest';
  * just stands, and a WIP-titled PR can merge.
  *
  * It also re-runs on pr-lifecycle's `pr-lifecycle/sign-off` commit status, which
- * the UAT and CI-change checks gate on and which can land after the push's run.
+ * the UAT and CI-change checks gate on and which can land after the push's run,
+ * and when the pr-lifecycle workflow completes: it writes the UAT label that
+ * `require-uat-label` waits on with GITHUB_TOKEN, which starts no `labeled` run.
  */
 
 type Workflow = {
-  on?: { pull_request_target?: { types?: string[] }; status?: unknown };
+  on?: {
+    pull_request_target?: { types?: string[] };
+    status?: unknown;
+    workflow_run?: { workflows?: string[]; types?: string[] };
+  };
   jobs?: { 'pr-policy'?: { if?: string } };
 };
 
@@ -44,6 +50,13 @@ describe('pr-policy.yml triggers', () => {
 
   it('re-runs on a commit status', () => {
     expect(Object.keys(workflow.on ?? {})).toContain('status');
+  });
+
+  it('re-runs when the pr-lifecycle workflow completes', () => {
+    expect(workflow.on?.workflow_run).toEqual({
+      workflows: ['pr-lifecycle'],
+      types: ['completed'],
+    });
   });
 
   it('runs on a status event only for the pr-lifecycle/sign-off context', () => {
