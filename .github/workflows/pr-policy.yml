@@ -57,7 +57,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: rmartz/pr-policy-action@80ade584e206ca645780f9a839581531d292076a # v1.7.0
+      - uses: rmartz/pr-policy-action@198e2027f3b9edb0b6afd3cd867ee7a783e6ec85 # v1.8.0
         with:
           pr: ${{ github.event.pull_request.number }}
           # pr-lifecycle posts its sign-off status as the rmartz-pr-lifecycle App;
