@@ -103,7 +103,9 @@ and **self-manages** its config. Fix conformance gaps directly here, in a PR.
 - **PR policy:** [`pr-policy.yml`](.github/workflows/pr-policy.yml) runs the
   shared `rmartz/pr-policy-action` checks on every PR and posts the `pr-policy`
   verdict. Its `title` check validates PR titles (Conventional Commits). It
-  passes `skip-uat: true` because the repo has nothing to user-test. Its trigger
+  passes `skip-uat: true`: the repo skips UAT by choice (the reusable workflows
+  it ships are user-facing, so this is a decision, not a claim there's nothing to
+  test). Its trigger
   includes `ready_for_review` and `converted_to_draft`, because the title check's
   WIP rule depends on draft state, and `status`, filtered to
   `pr-lifecycle/sign-off`, so the gate re-runs when pr-lifecycle's sign-off
