@@ -37,7 +37,7 @@ permissions:
 
 jobs:
   merge-safety:
-    uses: rmartz/merge-safety/.github/workflows/merge-safety.yml@b04c2fbe4fde8b8c3d040f21f0daa6984c4f0ae5 # v0.15.0
+    uses: rmartz/merge-safety/.github/workflows/merge-safety.yml@99ea3d17ddf656f2fe8caf04fd835f97b89022d7 # v0.17.0
     with:
       pr: ${{ inputs.pr }}
     secrets: inherit
