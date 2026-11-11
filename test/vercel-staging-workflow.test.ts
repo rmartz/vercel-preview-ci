@@ -75,7 +75,7 @@ describe('vercel-staging.yml public interface', () => {
     expect(call.inputs).toEqual({
       'alias-domain': expect.objectContaining({ type: 'string', required: true }),
       'env-branch': expect.objectContaining({ type: 'string', required: false, default: '' }),
-      'node-version': expect.objectContaining({ type: 'string', required: false, default: '24.x' }),
+      'node-version': expect.objectContaining({ type: 'string', required: false, default: '26.x' }),
       'vercel-version': expect.objectContaining({ type: 'string', required: false, default: '' }),
       'timeout-minutes': expect.objectContaining({ type: 'number', required: false, default: 10 }),
     });

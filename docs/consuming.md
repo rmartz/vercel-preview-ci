@@ -70,10 +70,15 @@ need UAT, so most repos can leave the Dependabot secrets unset.
 
 | Input             | Default | Meaning                                                                                 |
 | ----------------- | ------- | --------------------------------------------------------------------------------------- |
-| `node-version`    | `24.x`  | Node.js for the build. Match the Vercel project's Node.js setting.                      |
+| `node-version`    | `26.x`  | Node.js for the build. Match the Vercel project's Node.js setting.                      |
 | `vercel-version`  | `''`    | Exact Vercel CLI version. Empty uses the version pinned in this repo's `package.json`.  |
 | `timeout-minutes` | `10`    | Job timeout. Raise it only after measuring the build, never just to get past a timeout. |
 | `alias-domain`    | `''`    | A per-PR host to point at each new preview. See [below](#a-per-pr-preview-hostname).    |
+
+The `node-version` default moved from `24.x` to `26.x` in a major release. A
+caller whose Vercel project still runs Node.js 24 passes `node-version: 24.x`
+in its `with:` block, or moves the project setting to 26.x, before moving the
+pin. `vercel-staging.yml` has the same input and default.
 
 The workflow output `url` is the preview URL (empty when the gate skipped), and
 `alias-url` is `https://<alias-domain>` (empty when no alias was set). A
