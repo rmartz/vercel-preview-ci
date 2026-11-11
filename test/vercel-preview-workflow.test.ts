@@ -76,7 +76,7 @@ describe('vercel-preview.yml triggers and permissions', () => {
 describe('vercel-preview.yml public interface', () => {
   it('keeps the input names, types and defaults', () => {
     expect(call.inputs).toEqual({
-      'node-version': expect.objectContaining({ type: 'string', required: false, default: '24.x' }),
+      'node-version': expect.objectContaining({ type: 'string', required: false, default: '26.x' }),
       'vercel-version': expect.objectContaining({ type: 'string', required: false, default: '' }),
       'timeout-minutes': expect.objectContaining({ type: 'number', required: false, default: 10 }),
       'alias-domain': expect.objectContaining({ type: 'string', required: false, default: '' }),

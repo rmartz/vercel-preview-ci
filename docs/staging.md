@@ -73,7 +73,7 @@ still in flight, and a skipped event never joins the group.
 | ----------------- | ---------- | --------------------------------------------------------------------------------------------------------------- |
 | `alias-domain`    | (required) | The staging hostname, for example `staging.example.com`. A bare hostname only.                                  |
 | `env-branch`      | `''`       | Branch whose Preview variables staging uses. Empty is the default branch. See [below](#staging-only-variables). |
-| `node-version`    | `24.x`     | Node.js for the build. Match the Vercel project's Node.js setting.                                              |
+| `node-version`    | `26.x`     | Node.js for the build. Match the Vercel project's Node.js setting.                                              |
 | `vercel-version`  | `''`       | Exact Vercel CLI version. Empty uses the version pinned in this repo's `package.json`.                          |
 | `timeout-minutes` | `10`       | Job timeout. Raise it only after measuring the build, never just to get past a timeout.                         |
 
