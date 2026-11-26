@@ -5,8 +5,8 @@ one reusable workflow,
 [`vercel-preview.yml`](.github/workflows/vercel-preview.yml), that a Vercel-hosted
 repo pins by SHA and Dependabot keeps current. The workflow deploys a preview
 with the Vercel CLI only for a functional PR: a `feat`/`fix`/`perf`/`revert`
-title or the `preview` label, never with `no preview` or `do not merge`. A second reusable workflow,
-[`vercel-staging.yml`](.github/workflows/vercel-staging.yml), deploys the
+title or the `preview` label, never with `no preview` or `do not merge`. A
+second reusable workflow, [`vercel-staging.yml`](.github/workflows/vercel-staging.yml), deploys the
 default branch with Preview variables to a staging alias on each push
 ([docs/staging.md](docs/staging.md)). See [README.md](README.md) and the
 [documentation](docs/index.md).

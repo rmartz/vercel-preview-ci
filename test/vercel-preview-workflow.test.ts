@@ -157,21 +157,26 @@ const deploys = (scenario: Scenario): boolean => {
   return isTruthy(evaluate(gate, context));
 };
 
+const FUNCTIONAL_TITLES = [
+  'feat: x',
+  'fix: x',
+  'perf: x',
+  'revert: x',
+  'feat(ui): x',
+  'fix(api)!: x',
+  'feat!: x',
+  'perf!: x',
+  'revert(deps): x',
+  'Feat: x',
+  'FIX(api): x',
+];
+
 describe('vercel-preview.yml gate', () => {
   it('deploys a same-repo PR with a functional title on a new push', () => {
     expect(deploys({})).toBe(true);
   });
 
-  it.each([
-    'feat: x',
-    'fix: x',
-    'perf: x',
-    'revert: x',
-    'feat(ui): x',
-    'fix(api)!: x',
-    'feat!: x',
-    'revert(deps): x',
-  ])('treats %j as functional', (title) => {
+  it.each(FUNCTIONAL_TITLES)('treats %j as functional', (title) => {
     expect(deploys({ title })).toBe(true);
   });
 
@@ -240,6 +245,15 @@ describe('vercel-preview.yml gate', () => {
       },
     );
 
+    it.each(['do not merge', 'no preview'])(
+      'does not deploy when `preview` is added to a PR held by %j',
+      (held) => {
+        expect(deploys({ action: 'labeled', label: 'preview', labels: [held, 'preview'] })).toBe(
+          false,
+        );
+      },
+    );
+
     it('deploys when `preview` is added, even to a functional PR', () => {
       expect(deploys({ action: 'labeled', label: 'preview', labels: ['preview'] })).toBe(true);
       expect(
@@ -272,8 +286,21 @@ describe('vercel-preview.yml gate', () => {
         expect(deploys({ action: 'edited', bodyOnlyEdit: true })).toBe(false);
       });
 
-      it('does not redeploy when an already-functional title is reworded', () => {
-        expect(deploys({ action: 'edited', oldTitle: 'feat: x', title: 'fix: y' })).toBe(false);
+      // Runs every functional title through the old-title copy of the type list,
+      // so the two lists in the gate cannot drift apart unnoticed.
+      it.each(FUNCTIONAL_TITLES)('does not redeploy when %j is reworded', (oldTitle) => {
+        expect(deploys({ action: 'edited', oldTitle, title: 'fix: y' })).toBe(false);
+      });
+
+      it('does not deploy when Dependabot retitles its PR to a functional type', () => {
+        expect(
+          deploys({
+            action: 'edited',
+            author: 'dependabot[bot]',
+            oldTitle: 'chore(deps): bump x',
+            title: 'fix(deps): bump x',
+          }),
+        ).toBe(false);
       });
 
       it('does not deploy when the new title is not functional', () => {

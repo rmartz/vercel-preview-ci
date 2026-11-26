@@ -29,8 +29,9 @@ Every condition below must hold:
 type, `feat`, `fix`, `perf` or `revert`, with an optional `(scope)` and `!`:
 `feat: …`, `fix(api): …`, `perf!: …`, `revert(ui)!: …`. These are the types
 that release, so they are the changes worth testing. `chore`, `docs`, `ci`,
-`test`, `build`, `refactor` and `style` PRs get no preview. Like every Actions
-string comparison, the match ignores case. GitHub's own `Revert "…"` title is not
+`test`, `build`, `refactor` and `style` PRs get no preview. The match is a
+prefix check (`feat(` accepts `feat(ui) no colon`), and like every Actions
+string comparison it ignores case. GitHub's own `Revert "…"` title is not
 `revert:`, so it needs a retitle or `preview`.
 
 **Dependabot PRs never deploy on their title.** The gate skips any PR opened by
@@ -53,7 +54,7 @@ each one only in the cases where a new preview is useful:
 | `opened`      | Always, if the PR qualifies.                                                                                  |
 | `synchronize` | Always, if the PR qualifies. A new head commit was pushed.                                                    |
 | `reopened`    | Always, if the PR qualifies.                                                                                  |
-| `labeled`     | The label just added is `preview`.                                                                            |
+| `labeled`     | The label just added is `preview`, and the PR is not held by `do not merge` or `no preview`.                  |
 | `unlabeled`   | The label just removed is `do not merge` or `no preview`, and the PR qualifies.                               |
 | `edited`      | The title changed from a non-functional one to a functional one, and the PR does not already carry `preview`. |
 
@@ -65,6 +66,16 @@ Everything else is skipped:
 - **An unrelated label.** Otherwise every triage label rebuilds the same commit.
 - **A body edit, or rewording a title that was already functional.** The
   commit is unchanged and was already deployed.
+
+**Labels added after the PR opens race the `opened` deploy.** The `opened`
+event carries the labels the PR had at creation. `gh pr create --label` adds
+labels in a separate call after the PR exists, so a `no preview` or
+`do not merge` added that way may arrive too late to stop the first deploy,
+and the later `labeled` event cannot cancel it. To keep a functional PR from
+ever deploying, open it with a non-functional title and retitle it later, or add
+`no preview` right after opening and accept one deploy. Likewise, a PR opened
+with `preview` already applied may build twice (`opened` and `labeled`);
+concurrency cancels one of them.
 
 Removing `preview`, adding `no preview`, or retitling a PR to a non-functional
 type does **not** delete an existing preview. The PR simply stops being
@@ -89,7 +100,8 @@ deliberate.
 Before v3.0.0, a preview deployed only when a non-draft PR carried `UAT ready` (or
 the legacy `ready for UAT`), and `ready_for_review` deployed. That gate depended
 on a review step applying the label, which the fleet no longer does. The UAT
-labels now have no effect on previews.
+labels now have no effect on previews. To upgrade a caller, see
+[Upgrading from v2](consuming.md#upgrading-from-v2).
 
 ## Concurrency
 

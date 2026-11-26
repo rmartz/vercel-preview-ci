@@ -51,8 +51,8 @@ the copies had drifted into three policies:
   personal-budget).
 
 This repo started from the third model and, in v3, folded in the first: the
-gate reads the title type instead of a UAT label. The per-repo `preview-deploy.yml`
-becomes a short caller, and the `vercel-ignore-build.*` scripts become one
+gate reads the title type instead of a UAT label. The per-repo
+`preview-deploy.yml` becomes a short caller, and the `vercel-ignore-build.*` scripts become one
 `vercel.json` key. Tracked in
 [rmartz/ai-tools#311](https://github.com/rmartz/ai-tools/issues/311).
 

@@ -62,8 +62,7 @@ The job fails with a clear error if any of them is missing. Repos that already
 ran a per-repo `preview-deploy.yml` have them set.
 
 A run that **Dependabot** triggers (for example, its rebase of a PR labelled
-`preview`)
-receives only Dependabot secrets and a read-only token. Such a run fails at the
+`preview`) receives only Dependabot secrets and a read-only token. Such a run fails at the
 secrets check unless the three secrets are also set with
 `gh secret set <name> --app dependabot`. If they are set, the preview deploys,
 but the comment step is skipped because the token cannot write. The URL is still
@@ -132,9 +131,9 @@ After each successful deploy the workflow runs
 deploy. The alias URL appears in the job summary, the `alias-url` output, and
 the sticky comment. The comment leads with the alias URL and lists the raw
 `*.vercel.app` URL below it as `Deployment:`. Each new push to the PR moves the
-PR's host to the new preview. When the PR stops qualifying (for example, it gets
-`no preview`), the host keeps pointing at that PR's last preview, the same as the preview itself (see
-[The deploy gate](gating.md#which-events-deploy)). Hosts are not cleaned up when
+PR's host to the new preview. When the PR stops qualifying (for example, it
+gets `no preview`), the host keeps pointing at that PR's last preview, the same
+as the preview itself (see [The deploy gate](gating.md#which-events-deploy)). Hosts are not cleaned up when
 the PR closes
 ([rmartz/vercel-preview-ci#4](https://github.com/rmartz/vercel-preview-ci/issues/4)).
 
@@ -162,6 +161,21 @@ would run, so the preview matches a real Vercel build.
 The repo's `.github/dependabot.yml` needs a `github-actions` entry. That entry
 bumps this workflow's `@<sha>` pin with each release. Each Vercel CLI bump in
 this repo is a release, so consumers receive CLI updates through the same pin.
+
+## Upgrading from v2
+
+v3 replaced the `UAT ready` label gate with the title-type gate (see
+[The deploy gate](gating.md)). Dependabot bumps the pin on its own, but a
+caller that keeps its v2 trigger misses `opened` and `edited`: a new `feat:` PR
+then deploys only on its next push, and a retitle never deploys. Nothing fails,
+so make these changes with the pin bump:
+
+1. Change the caller's trigger to
+   `types: [opened, synchronize, reopened, edited, labeled, unlabeled]`,
+   dropping `ready_for_review`.
+2. Create the `preview` and `no preview` labels.
+3. Retire `UAT ready` and `ready for UAT` from any preview tooling; they no
+   longer deploy anything.
 
 ## Migrating a repo that has its own preview-deploy.yml
 
