@@ -42,7 +42,6 @@ const readText = (path: string) => readFileSync(new URL(`../${path}`, import.met
 const workflow = parse(readText('.github/workflows/vercel-preview.yml')) as Workflow;
 const job = workflow.jobs?.deploy ?? {};
 const steps = job.steps ?? [];
-const gate = job.if ?? '';
 const stepNamed = (name: string) => steps.find((step) => step.name === name);
 const stepIndex = (name: string) => steps.findIndex((step) => step.name === name);
 const call = workflow.on?.workflow_call ?? {};

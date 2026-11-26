@@ -29,10 +29,8 @@ const evaluateGate = (github: Record<string, unknown>): boolean => {
   return truthy(new Evaluator(parsedGate, context).evaluate());
 };
 
-// The gate (docs/gating.md), run against sample pull_request events with a
-// small Actions-expression evaluator. Each case starts from a same-repo,
-// human-authored PR with a functional title on a new push, which deploys, and
-// changes one thing.
+// Each case starts from a same-repo, human-authored PR with a functional title
+// on a new push, which deploys, and changes one thing.
 type Scenario = {
   action?: string;
   title?: string;
@@ -214,6 +212,15 @@ describe('vercel-preview.yml gate', () => {
           expect(deploys({ action: 'edited', oldTitle, title: 'feat: x' })).toBe(true);
         },
       );
+
+      // docs/gating.md's race workaround relies on this.
+      it('does not deploy a retitle of a PR held by `no preview` or `do not merge`', () => {
+        for (const held of ['no preview', 'do not merge']) {
+          expect(
+            deploys({ action: 'edited', oldTitle: 'chore: x', title: 'feat: x', labels: [held] }),
+          ).toBe(false);
+        }
+      });
 
       it('does not deploy on a body-only edit', () => {
         expect(deploys({ action: 'edited', bodyOnlyEdit: true })).toBe(false);

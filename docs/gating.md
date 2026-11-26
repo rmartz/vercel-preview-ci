@@ -73,9 +73,9 @@ labels in a separate call after the PR exists, so a `no preview` or
 `do not merge` added that way may arrive too late to stop the first deploy,
 and the later `labeled` event cannot cancel it. To keep a functional PR from
 ever deploying, open it with a non-functional title, add `no preview`, then
-retitle it; or add `no preview` right after opening and accept one deploy. Likewise, a PR opened
-with `preview` already applied may build twice (`opened` and `labeled`);
-concurrency cancels one of them.
+retitle it; or add `no preview` right after opening and accept one deploy.
+Likewise, a PR opened with `preview` already applied may build twice (`opened`
+and `labeled`); concurrency cancels one of them.
 
 Removing `preview`, adding `no preview`, or retitling a PR to a non-functional
 type does **not** delete an existing preview. The PR simply stops being
