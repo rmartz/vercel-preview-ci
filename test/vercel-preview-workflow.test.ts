@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs';
 import { parse } from 'yaml';
 import { describe, expect, it } from 'vitest';
 
+import { evaluate, isTruthy } from './support/actions-expression.js';
+
 /**
  * Guards the consumer-facing contracts of the reusable workflow. None of these
  * fail in this repo's own CI when they regress — the workflow never runs here —
@@ -98,28 +100,202 @@ describe('vercel-preview.yml public interface', () => {
   });
 });
 
+// The gate (docs/gating.md), run against sample pull_request events with a
+// small Actions-expression evaluator. Each case starts from a same-repo,
+// human-authored PR with a functional title on a new push, which deploys, and
+// changes one thing.
+type Scenario = {
+  action?: string;
+  title?: string;
+  labels?: string[];
+  label?: string;
+  author?: string;
+  draft?: boolean;
+  fork?: boolean;
+  eventName?: string;
+  oldTitle?: string;
+  bodyOnlyEdit?: boolean;
+};
+
+const deploys = (scenario: Scenario): boolean => {
+  const {
+    action = 'synchronize',
+    title = 'feat: add a thing',
+    labels = [],
+    label,
+    author = 'rmartz',
+    draft = false,
+    fork = false,
+    eventName = 'pull_request',
+    oldTitle,
+    bodyOnlyEdit = false,
+  } = scenario;
+  const changes = bodyOnlyEdit
+    ? { body: { from: 'old body' } }
+    : oldTitle === undefined
+      ? {}
+      : { title: { from: oldTitle } };
+  const context = {
+    github: {
+      event_name: eventName,
+      repository: 'rmartz/app',
+      event: {
+        action,
+        ...(label === undefined ? {} : { label: { name: label } }),
+        ...(action === 'edited' ? { changes } : {}),
+        pull_request: {
+          title,
+          draft,
+          number: 7,
+          user: { login: author },
+          labels: labels.map((name) => ({ name })),
+          head: { repo: { full_name: fork ? 'someone/app' : 'rmartz/app' } },
+        },
+      },
+    },
+  };
+  return isTruthy(evaluate(gate, context));
+};
+
 describe('vercel-preview.yml gate', () => {
-  it('skips fork PRs so the Vercel token never reaches fork-authored code', () => {
+  it('deploys a same-repo PR with a functional title on a new push', () => {
+    expect(deploys({})).toBe(true);
+  });
+
+  it.each([
+    'feat: x',
+    'fix: x',
+    'perf: x',
+    'revert: x',
+    'feat(ui): x',
+    'fix(api)!: x',
+    'feat!: x',
+    'revert(deps): x',
+  ])('treats %j as functional', (title) => {
+    expect(deploys({ title })).toBe(true);
+  });
+
+  it.each([
+    'chore: x',
+    'docs: x',
+    'ci: x',
+    'test: x',
+    'build(deps): x',
+    'refactor: x',
+    'style: x',
+    'chore(deps): bump vercel',
+    'feature: x',
+    'fixup: x',
+    'Revert "feat: x"',
+    'WIP feat: x',
+  ])('treats %j as non-functional', (title) => {
+    expect(deploys({ title })).toBe(false);
+  });
+
+  it('forces a deploy of a non-functional title with the `preview` label', () => {
+    expect(deploys({ title: 'chore: x', labels: ['preview'] })).toBe(true);
+  });
+
+  it('deploys drafts', () => {
+    expect(deploys({ draft: true })).toBe(true);
+  });
+
+  // The Vercel token must never reach fork-authored code.
+  it('skips fork PRs, even with `preview`', () => {
     expect(gate).toContain('github.event.pull_request.head.repo.full_name == github.repository');
+    expect(deploys({ fork: true })).toBe(false);
+    expect(deploys({ fork: true, labels: ['preview'] })).toBe(false);
   });
 
-  it('skips drafts and PRs held by `do not merge`', () => {
-    expect(gate).toContain('!github.event.pull_request.draft');
-    expect(gate).toContain("!contains(github.event.pull_request.labels.*.name, 'do not merge')");
+  it('skips anything but pull_request events', () => {
+    expect(deploys({ eventName: 'pull_request_target' })).toBe(false);
   });
 
-  // Both spellings while the fleet-wide rename (rmartz/dotfiles#1572) is in
-  // progress. Dropping `ready for UAT` is a breaking change for any consumer
-  // still on the old label — ship it as a major.
-  it.each(['UAT ready', 'ready for UAT'])('deploys on the %s label', (label) => {
-    expect(gate).toContain(`contains(github.event.pull_request.labels.*.name, '${label}')`);
-    expect(gate).toContain(`github.event.label.name == '${label}'`);
+  it.each(['do not merge', 'no preview'])('skips a PR labelled %j, even with `preview`', (held) => {
+    expect(deploys({ labels: [held] })).toBe(false);
+    expect(deploys({ labels: [held, 'preview'] })).toBe(false);
   });
 
-  it('redeploys when `do not merge` is removed', () => {
-    expect(gate).toContain(
-      "github.event.action == 'unlabeled' && github.event.label.name == 'do not merge'",
+  describe('Dependabot', () => {
+    it('skips its PRs, even with a functional title', () => {
+      expect(deploys({ author: 'dependabot[bot]', title: 'chore(deps): bump x' })).toBe(false);
+      expect(deploys({ author: 'dependabot[bot]', title: 'fix(deps): bump vercel' })).toBe(false);
+    });
+
+    it('deploys its PR when it carries `preview`', () => {
+      expect(deploys({ author: 'dependabot[bot]', labels: ['preview'] })).toBe(true);
+    });
+  });
+
+  describe('which events deploy', () => {
+    it.each(['opened', 'synchronize', 'reopened'])('deploys on %s', (action) => {
+      expect(deploys({ action })).toBe(true);
+    });
+
+    // Taking a PR out of draft to merge it must not rebuild it.
+    it.each(['ready_for_review', 'converted_to_draft', 'closed', 'assigned'])(
+      'does not deploy on %s',
+      (action) => {
+        expect(deploys({ action })).toBe(false);
+      },
     );
+
+    it('deploys when `preview` is added, even to a functional PR', () => {
+      expect(deploys({ action: 'labeled', label: 'preview', labels: ['preview'] })).toBe(true);
+      expect(
+        deploys({ action: 'labeled', label: 'preview', labels: ['preview'], title: 'docs: x' }),
+      ).toBe(true);
+    });
+
+    // Otherwise every triage label rebuilds the same commit.
+    it('does not deploy when an unrelated label is added', () => {
+      expect(deploys({ action: 'labeled', label: 'Docs', labels: ['Docs'] })).toBe(false);
+      expect(deploys({ action: 'labeled', label: 'UAT ready', labels: ['UAT ready'] })).toBe(false);
+    });
+
+    it.each(['do not merge', 'no preview'])('deploys when %j is removed', (label) => {
+      expect(deploys({ action: 'unlabeled', label })).toBe(true);
+      expect(deploys({ action: 'unlabeled', label, title: 'chore: x' })).toBe(false);
+    });
+
+    it('does not deploy when `preview` or an unrelated label is removed', () => {
+      expect(deploys({ action: 'unlabeled', label: 'preview' })).toBe(false);
+      expect(deploys({ action: 'unlabeled', label: 'Docs' })).toBe(false);
+    });
+
+    describe('edited', () => {
+      it('deploys when the title newly becomes functional', () => {
+        expect(deploys({ action: 'edited', oldTitle: 'chore: x', title: 'feat: x' })).toBe(true);
+      });
+
+      it('does not deploy on a body-only edit', () => {
+        expect(deploys({ action: 'edited', bodyOnlyEdit: true })).toBe(false);
+      });
+
+      it('does not redeploy when an already-functional title is reworded', () => {
+        expect(deploys({ action: 'edited', oldTitle: 'feat: x', title: 'fix: y' })).toBe(false);
+      });
+
+      it('does not deploy when the new title is not functional', () => {
+        expect(deploys({ action: 'edited', oldTitle: 'feat: x', title: 'chore: x' })).toBe(false);
+      });
+
+      it('does not redeploy a PR `preview` already deployed', () => {
+        expect(
+          deploys({
+            action: 'edited',
+            oldTitle: 'chore: x',
+            title: 'feat: x',
+            labels: ['preview'],
+          }),
+        ).toBe(false);
+      });
+    });
+  });
+
+  // The UAT labels no longer gate anything (a breaking change, shipped as a major).
+  it('no longer reads the UAT labels', () => {
+    expect(gate).not.toContain('UAT');
   });
 });
 

@@ -1,11 +1,11 @@
 # Agent guide — vercel-preview-ci
 
-This repo is the fleet's shared **label-driven Vercel preview deploy**. It ships
+This repo is the fleet's shared **gated Vercel preview deploy**. It ships
 one reusable workflow,
 [`vercel-preview.yml`](.github/workflows/vercel-preview.yml), that a Vercel-hosted
 repo pins by SHA and Dependabot keeps current. The workflow deploys a preview
-with the Vercel CLI only when a PR carries `UAT ready` (or the legacy
-`ready for UAT`). A second reusable workflow,
+with the Vercel CLI only for a functional PR: a `feat`/`fix`/`perf`/`revert`
+title or the `preview` label, never with `no preview` or `do not merge`. A second reusable workflow,
 [`vercel-staging.yml`](.github/workflows/vercel-staging.yml), deploys the
 default branch with Preview variables to a staging alias on each push
 ([docs/staging.md](docs/staging.md)). See [README.md](README.md) and the
@@ -57,16 +57,17 @@ guards each of these:
 - **Fork safety.** The gate requires the head repo to be this repo. The Vercel
   token must never reach fork-authored code.
 - **Unrelated labels do not redeploy.** A `labeled` event deploys only when the
-  label added is a UAT label. Otherwise every triage label rebuilds the same
+  label added is `preview`. Otherwise every triage label rebuilds the same
   preview. See [docs/gating.md](docs/gating.md).
+- **Non-functional changes do not deploy,** drafts or not: no deploy on
+  `ready_for_review`, on Dependabot PRs without `preview`, on a body edit, or on
+  rewording an already-functional title.
 - **Concurrency stays on the job,** so a skipped event never cancels a real
   deploy.
 - **The CLI version comes from `package.json` at `job.workflow_sha`,** and the
   checkout is deleted before `vercel build`.
 - **`NODE_AUTH_TOKEN` on the build step and `packages: read`,** so a consumer
   whose `.npmrc` scopes GitHub Packages can install.
-- **Dropping `ready for UAT`** is a `feat!` major, released only after the
-  fleet rename (rmartz/dotfiles#1572) completes.
 
 ## Reusable-workflow gotcha: no `./`-local actions across the boundary
 

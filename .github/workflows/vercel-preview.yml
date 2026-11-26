@@ -1,14 +1,17 @@
 name: Vercel Preview (reusable)
 
-# Label-driven Vercel preview deploy for a consuming repo. A preview exists to
-# enable UAT, so one is deployed only when a PR is marked ready for UAT, not on
-# every push. The Vercel CLI builds the PR head here in Actions and deploys the
-# prebuilt output; the URL is posted as one update-in-place PR comment. The
-# consumer's caller is about 10 lines (see docs/consuming.md):
+# Vercel preview deploy for a consuming repo, gated so that only functional
+# changes get one. A PR deploys when its title has a functional Conventional
+# Commit type (feat, fix, perf, revert) or it carries the `preview` label; a
+# `no preview` or `do not merge` label skips it. Drafts deploy too: a preview is
+# for testing the change, which happens before the PR is marked ready. The Vercel
+# CLI builds the PR head here in Actions and deploys the prebuilt output; the
+# URL is posted as one update-in-place PR comment. The consumer's caller is
+# about 10 lines (see docs/consuming.md):
 #
 #   on:
 #     pull_request:
-#       types: [labeled, unlabeled, synchronize, reopened, ready_for_review]
+#       types: [opened, synchronize, reopened, edited, labeled, unlabeled]
 #   jobs:
 #     preview:
 #       uses: rmartz/vercel-preview-ci/.github/workflows/vercel-preview.yml@<sha>  # vX.Y.Z
@@ -85,25 +88,42 @@ jobs:
     # The gate. Every term is a fleet contract (docs/gating.md):
     #  - pull_request events only, and same-repo PRs only: fork PRs get no
     #    secrets, and the Vercel token must never reach fork-authored code.
-    #  - not a draft, and not held by `do not merge`.
-    #  - the PR carries `UAT ready`, or the legacy `ready for UAT` while the
-    #    fleet-wide rename (rmartz/dotfiles#1572) is in progress.
-    #  - the event could change what the preview should show: a new head commit
-    #    (synchronize), a reopen, leaving draft, the UAT label itself being
-    #    added, or `do not merge` being removed. Adding an unrelated label to an
-    #    already-labelled PR must NOT redeploy, or every triage label costs a
-    #    build.
+    #  - not held by `do not merge`, and not opted out with `no preview`.
+    #    Drafts DO deploy: the preview is for testing before the PR is ready.
+    #  - the PR wants a preview: it carries `preview` (which forces one, even on
+    #    a Dependabot PR), or its title has a functional Conventional Commit type
+    #    (feat, fix, perf, revert; optional scope and `!`) and Dependabot did not
+    #    open it. chore/docs/ci/test/build/refactor/style PRs get no preview.
+    #  - the event could change what the preview should show: the PR opened or
+    #    reopened, a new head commit (synchronize), `preview` being added,
+    #    `do not merge` or `no preview` being removed, or a title edit that newly
+    #    makes the PR functional. `ready_for_review` is deliberately absent:
+    #    taking a PR out of draft to merge it must not rebuild it. An unrelated
+    #    label, a body edit, or rewording an already-functional title must NOT
+    #    redeploy, or each one costs a build of a commit already deployed.
+    # Actions' startsWith and == compare case-insensitively.
     if: >-
       github.event_name == 'pull_request'
       && github.event.pull_request.head.repo.full_name == github.repository
-      && !github.event.pull_request.draft
       && !contains(github.event.pull_request.labels.*.name, 'do not merge')
-      && (contains(github.event.pull_request.labels.*.name, 'UAT ready')
-        || contains(github.event.pull_request.labels.*.name, 'ready for UAT'))
-      && (contains(fromJSON('["synchronize","reopened","ready_for_review"]'), github.event.action)
-        || (github.event.action == 'labeled'
-          && (github.event.label.name == 'UAT ready' || github.event.label.name == 'ready for UAT'))
-        || (github.event.action == 'unlabeled' && github.event.label.name == 'do not merge'))
+      && !contains(github.event.pull_request.labels.*.name, 'no preview')
+      && (contains(github.event.pull_request.labels.*.name, 'preview')
+        || (github.event.pull_request.user.login != 'dependabot[bot]'
+          && (startsWith(github.event.pull_request.title, 'feat:') || startsWith(github.event.pull_request.title, 'feat(') || startsWith(github.event.pull_request.title, 'feat!:')
+          || startsWith(github.event.pull_request.title, 'fix:') || startsWith(github.event.pull_request.title, 'fix(') || startsWith(github.event.pull_request.title, 'fix!:')
+          || startsWith(github.event.pull_request.title, 'perf:') || startsWith(github.event.pull_request.title, 'perf(') || startsWith(github.event.pull_request.title, 'perf!:')
+          || startsWith(github.event.pull_request.title, 'revert:') || startsWith(github.event.pull_request.title, 'revert(') || startsWith(github.event.pull_request.title, 'revert!:'))))
+      && (contains(fromJSON('["opened","synchronize","reopened"]'), github.event.action)
+        || (github.event.action == 'labeled' && github.event.label.name == 'preview')
+        || (github.event.action == 'unlabeled'
+          && (github.event.label.name == 'do not merge' || github.event.label.name == 'no preview'))
+        || (github.event.action == 'edited'
+          && github.event.changes.title
+          && !contains(github.event.pull_request.labels.*.name, 'preview')
+          && !(startsWith(github.event.changes.title.from, 'feat:') || startsWith(github.event.changes.title.from, 'feat(') || startsWith(github.event.changes.title.from, 'feat!:')
+          || startsWith(github.event.changes.title.from, 'fix:') || startsWith(github.event.changes.title.from, 'fix(') || startsWith(github.event.changes.title.from, 'fix!:')
+          || startsWith(github.event.changes.title.from, 'perf:') || startsWith(github.event.changes.title.from, 'perf(') || startsWith(github.event.changes.title.from, 'perf!:')
+          || startsWith(github.event.changes.title.from, 'revert:') || startsWith(github.event.changes.title.from, 'revert(') || startsWith(github.event.changes.title.from, 'revert!:'))))
     # Per-PR, job-level: a newer push supersedes an in-flight deploy of an older
     # commit. Job-level (not workflow-level) so an event the gate skips never
     # joins the group and cannot cancel a deploy that is still needed.

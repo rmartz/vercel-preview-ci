@@ -1,18 +1,21 @@
 # vercel-preview-ci
 
-Label-driven Vercel preview deploys for the fleet's Vercel-hosted repos.
+Gated Vercel preview deploys for the fleet's Vercel-hosted repos.
 
 Vercel's Git integration builds a preview on every push, including pushes for
 documentation, CI, and test-only changes that nobody opens. This repo ships one
-reusable workflow that deploys a preview **only when a PR is marked ready for
-UAT**:
+reusable workflow that deploys a preview **only for functional changes**:
 
-- A PR gets a preview when it receives the `UAT ready` label. The legacy
-  `ready for UAT` is also accepted while the fleet renames it.
-- It is redeployed on each new push while it keeps the label. Adding an
-  unrelated label does not redeploy.
-- Drafts, PRs labelled `do not merge`, and fork PRs are skipped.
+- A PR gets a preview when its title has a functional Conventional Commit type
+  (`feat`, `fix`, `perf` or `revert`, with optional scope and `!`), or when it
+  carries the `preview` label. Drafts deploy too.
+- It is redeployed on each new push. Marking it ready for review, adding an
+  unrelated label, or editing its body does not redeploy.
+- PRs labelled `no preview` or `do not merge`, Dependabot PRs (unless labelled
+  `preview`), and fork PRs are skipped.
 - The preview URL is posted as one PR comment that is edited in place.
+
+See [The deploy gate](docs/gating.md) for the exact rules.
 
 Production is unchanged. Vercel's Git integration keeps deploying `main`.
 
@@ -20,7 +23,7 @@ Production is unchanged. Vercel's Git integration keeps deploying `main`.
 
 The supported way to consume this repo is
 **[the golden pattern](docs/golden-pattern.md)**: production, staging and
-per-PR UAT previews, each on a host you own, on any Vercel plan. It has
+per-PR previews, each on a host you own, on any Vercel plan. It has
 copy-paste callers for both workflows and a DNS and Vercel checklist. The
 quickstart below is its minimal subset, previews only.
 
@@ -33,7 +36,7 @@ quickstart below is its minimal subset, previews only.
 
    on:
      pull_request:
-       types: [labeled, unlabeled, synchronize, reopened, ready_for_review]
+       types: [opened, synchronize, reopened, edited, labeled, unlabeled]
 
    permissions:
      contents: read
@@ -46,7 +49,9 @@ quickstart below is its minimal subset, previews only.
        secrets: inherit # VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
    ```
 
-2. Turn off Git-integration previews in `vercel.json`, keeping production:
+2. Create the `preview` and `no preview` labels in the repo.
+
+3. Turn off Git-integration previews in `vercel.json`, keeping production:
 
    ```json
    {
@@ -56,12 +61,12 @@ quickstart below is its minimal subset, previews only.
    }
    ```
 
-3. Make sure `.github/dependabot.yml` has a `github-actions` entry so the pin
+4. Make sure `.github/dependabot.yml` has a `github-actions` entry so the pin
    stays current.
 
 ### Optional: a per-PR preview hostname
 
-Set `alias-domain` to a host built from the PR number, and each UAT deploy
+Set `alias-domain` to a host built from the PR number, and each preview deploy
 points that PR's own host at its new preview. Auth allowlists (OAuth redirect
 URIs, Firebase authorized domains) can then name hosts you own instead of all of
 `vercel.app`, and the sticky comment leads with the PR's host. Nothing changes

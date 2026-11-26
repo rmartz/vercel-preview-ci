@@ -14,11 +14,11 @@ Environments, so it works on the Hobby plan.
 
 ## The three tiers
 
-| Tier       | Code           | Vercel environment | Deployed by                                                           |
-| ---------- | -------------- | ------------------ | --------------------------------------------------------------------- |
-| Production | default branch | Production         | Vercel's Git integration (unchanged)                                  |
-| Staging    | default branch | Preview            | `vercel-staging.yml`, on push                                         |
-| Preview    | a PR's head    | Preview            | `vercel-preview.yml`, on the UAT label ([consuming.md](consuming.md)) |
+| Tier       | Code           | Vercel environment | Deployed by                                                      |
+| ---------- | -------------- | ------------------ | ---------------------------------------------------------------- |
+| Production | default branch | Production         | Vercel's Git integration (unchanged)                             |
+| Staging    | default branch | Preview            | `vercel-staging.yml`, on push                                    |
+| Preview    | a PR's head    | Preview            | `vercel-preview.yml`, on functional PRs ([gating.md](gating.md)) |
 
 Staging and PR previews share the Preview environment, so by default they get
 the **same variables** (for example the same `APP_ENV`). See

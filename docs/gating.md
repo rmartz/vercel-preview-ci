@@ -1,56 +1,95 @@
 ---
 type: Reference
 title: The deploy gate
-description: Exactly which pull_request events deploy a preview — the UAT labels, the draft / do-not-merge / fork exclusions, why unrelated labels do not redeploy, and the per-PR concurrency.
-tags: [vercel, preview, uat, labels, gating]
+description: Exactly which pull_request events deploy a preview — the functional title types, the `preview` and `no preview` labels, the do-not-merge / fork / Dependabot exclusions, why ready_for_review and unrelated labels do not redeploy, and the per-PR concurrency.
+tags: [vercel, preview, labels, gating, conventional-commits]
 ---
 
 # The deploy gate
 
 The workflow's only job has an `if:` gate. A skipped job costs nothing: no
-runner and no deploy. Every condition below must hold for a deploy to run.
+runner and no deploy. A preview is for testing a functional change, so the gate
+deploys PRs that change behavior and skips the rest (docs, CI, tests, chores,
+dependency bumps), whether or not the PR is a draft.
 
-| Condition                                           | Why                                                                                           |
-| --------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Event is `pull_request`                             | The gate reads PR fields. Other events never deploy.                                          |
-| Head repo is this repo                              | Fork PRs get no secrets, and the Vercel token must never reach fork-authored code.            |
-| PR is not a draft                                   | A draft is unfinished work.                                                                   |
-| PR does not carry `do not merge`                    | A held PR is not ready for testing.                                                           |
-| PR carries `UAT ready` **or** `ready for UAT`       | The label is the request for a preview.                                                       |
-| The event could change what the preview should show | See below. Without this, any label added to a labelled PR would rebuild an identical preview. |
+## Which PRs deploy
+
+Every condition below must hold:
+
+| Condition                                     | Why                                                                                |
+| --------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Event is `pull_request`                       | The gate reads PR fields. Other events never deploy.                               |
+| Head repo is this repo                        | Fork PRs get no secrets, and the Vercel token must never reach fork-authored code. |
+| PR does not carry `do not merge`              | A held PR is not ready for testing.                                                |
+| PR does not carry `no preview`                | The opt-out. It wins over everything else, `preview` included.                     |
+| PR is functional **or** carries `preview`     | See below.                                                                         |
+| The event could change what the preview shows | See [Which events deploy](#which-events-deploy).                                   |
+
+**Functional** means the PR title starts with a functional Conventional Commit
+type, `feat`, `fix`, `perf` or `revert`, with an optional `(scope)` and `!`:
+`feat: …`, `fix(api): …`, `perf!: …`, `revert(ui)!: …`. These are the types
+that release, so they are the changes worth testing. `chore`, `docs`, `ci`,
+`test`, `build`, `refactor` and `style` PRs get no preview. Like every Actions
+string comparison, the match ignores case. GitHub's own `Revert "…"` title is not
+`revert:`, so it needs a retitle or `preview`.
+
+**Dependabot PRs never deploy on their title.** The gate skips any PR opened by
+`dependabot[bot]` unless it carries `preview`, so a bump titled `fix(deps): …`
+does not build either.
+
+**`preview` forces a deploy** of any same-repo PR that is not held, whatever its
+title or author. Use it when a `refactor:` or `chore:` PR still needs a look.
+
+**Drafts deploy.** Testing happens before a PR is marked ready, so a draft with
+a functional title gets a preview on each push.
 
 ## Which events deploy
 
-The caller subscribes to five `pull_request` activity types. The gate accepts
+The caller subscribes to six `pull_request` activity types. The gate accepts
 each one only in the cases where a new preview is useful:
 
-| Activity           | Deploys when                                                 |
-| ------------------ | ------------------------------------------------------------ |
-| `labeled`          | The label just added is `UAT ready` or `ready for UAT`.      |
-| `unlabeled`        | The label just removed is `do not merge`.                    |
-| `synchronize`      | Always, if the PR is labelled. A new head commit was pushed. |
-| `reopened`         | Always, if the PR is labelled.                               |
-| `ready_for_review` | Always, if the PR is labelled. A labelled draft left draft.  |
+| Activity      | Deploys when                                                                                                  |
+| ------------- | ------------------------------------------------------------------------------------------------------------- |
+| `opened`      | Always, if the PR qualifies.                                                                                  |
+| `synchronize` | Always, if the PR qualifies. A new head commit was pushed.                                                    |
+| `reopened`    | Always, if the PR qualifies.                                                                                  |
+| `labeled`     | The label just added is `preview`.                                                                            |
+| `unlabeled`   | The label just removed is `do not merge` or `no preview`, and the PR qualifies.                               |
+| `edited`      | The title changed from a non-functional one to a functional one, and the PR does not already carry `preview`. |
 
-Removing the UAT label does **not** delete an existing preview. The PR simply
-stops being redeployed, and the sticky comment keeps pointing at the last
-preview. If the consumer sets a per-PR `alias-domain`, the PR's host also keeps
-pointing at that preview (see
+Everything else is skipped:
+
+- **`ready_for_review`.** Taking a PR out of draft, often just to merge it, must
+  not rebuild a commit that was already deployed as a draft. A caller still
+  subscribed to it from an older version does no harm; the gate skips it.
+- **An unrelated label.** Otherwise every triage label rebuilds the same commit.
+- **A body edit, or rewording a title that was already functional.** The
+  commit is unchanged and was already deployed.
+
+Removing `preview`, adding `no preview`, or retitling a PR to a non-functional
+type does **not** delete an existing preview. The PR simply stops being
+redeployed, and the sticky comment keeps pointing at the last preview. If the
+consumer sets a per-PR `alias-domain`, the PR's host also keeps pointing at that
+preview (see
 [A per-PR preview hostname](consuming.md#a-per-pr-preview-hostname)).
 
-## The label rename
+## The labels
 
-The fleet is renaming `ready for UAT` to `UAT ready`
-([rmartz/dotfiles#1572](https://github.com/rmartz/dotfiles/issues/1572)). Both
-names are accepted while the rename rolls out. When every consumer has moved,
-dropping `ready for UAT` is a **breaking change** for any repo that still uses
-it, so release it as a major (`feat!:`). The test in
+Create `preview` and `no preview` in each consuming repo. `do not merge` is
+already part of the fleet's label roster.
+
+The label names are fixed in the workflow, not inputs. They are a fleet
+contract, and a per-repo override would let one repo drift from it. The test in
 [`test/vercel-preview-workflow.test.ts`](../test/vercel-preview-workflow.test.ts)
-pins both names so the change is deliberate.
+runs the gate against sample events, so any change to these rules is
+deliberate.
 
-The label names are fixed in the workflow, not inputs. They are a fleet contract
-shared with `/review` and `pr-policy`'s UAT check, and a per-repo override would
-let one repo drift from that contract.
+## History: the UAT labels
+
+Before v3.0.0, a preview deployed only when a non-draft PR carried `UAT ready` (or
+the legacy `ready for UAT`), and `ready_for_review` deployed. That gate depended
+on a review step applying the label, which the fleet no longer does. The UAT
+labels now have no effect on previews.
 
 ## Concurrency
 
