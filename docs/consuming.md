@@ -62,8 +62,8 @@ The job fails with a clear error if any of them is missing. Repos that already
 ran a per-repo `preview-deploy.yml` have them set.
 
 A run that **Dependabot** triggers (for example, its rebase of a PR labelled
-`preview`) receives only Dependabot secrets and a read-only token. Such a run fails at the
-secrets check unless the three secrets are also set with
+`preview`) receives only Dependabot secrets and a read-only token. Such a run
+fails at the secrets check unless the three secrets are also set with
 `gh secret set <name> --app dependabot`. If they are set, the preview deploys,
 but the comment step is skipped because the token cannot write. The URL is still
 in the job summary and the `url` output. A run started by a person labelling a
@@ -133,8 +133,8 @@ the sticky comment. The comment leads with the alias URL and lists the raw
 `*.vercel.app` URL below it as `Deployment:`. Each new push to the PR moves the
 PR's host to the new preview. When the PR stops qualifying (for example, it
 gets `no preview`), the host keeps pointing at that PR's last preview, the same
-as the preview itself (see [The deploy gate](gating.md#which-events-deploy)). Hosts are not cleaned up when
-the PR closes
+as the preview itself (see [The deploy gate](gating.md#which-events-deploy)).
+Hosts are not cleaned up when the PR closes
 ([rmartz/vercel-preview-ci#4](https://github.com/rmartz/vercel-preview-ci/issues/4)).
 
 The value must be a bare hostname once the expression is expanded, without a

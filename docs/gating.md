@@ -49,14 +49,14 @@ a functional title gets a preview on each push.
 The caller subscribes to six `pull_request` activity types. The gate accepts
 each one only in the cases where a new preview is useful:
 
-| Activity      | Deploys when                                                                                                  |
-| ------------- | ------------------------------------------------------------------------------------------------------------- |
-| `opened`      | Always, if the PR qualifies.                                                                                  |
-| `synchronize` | Always, if the PR qualifies. A new head commit was pushed.                                                    |
-| `reopened`    | Always, if the PR qualifies.                                                                                  |
-| `labeled`     | The label just added is `preview`, and the PR is not held by `do not merge` or `no preview`.                  |
-| `unlabeled`   | The label just removed is `do not merge` or `no preview`, and the PR qualifies.                               |
-| `edited`      | The title changed from a non-functional one to a functional one, and the PR does not already carry `preview`. |
+| Activity      | Deploys when                                                                                                                |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `opened`      | Always, if the PR qualifies.                                                                                                |
+| `synchronize` | Always, if the PR qualifies. A new head commit was pushed.                                                                  |
+| `reopened`    | Always, if the PR qualifies.                                                                                                |
+| `labeled`     | The label just added is `preview`, and the PR is not held by `do not merge` or `no preview`.                                |
+| `unlabeled`   | The label just removed is `do not merge` or `no preview`, and the PR qualifies.                                             |
+| `edited`      | The title changed from a non-functional one to a functional one, the PR qualifies, and it does not already carry `preview`. |
 
 Everything else is skipped:
 
@@ -72,8 +72,8 @@ event carries the labels the PR had at creation. `gh pr create --label` adds
 labels in a separate call after the PR exists, so a `no preview` or
 `do not merge` added that way may arrive too late to stop the first deploy,
 and the later `labeled` event cannot cancel it. To keep a functional PR from
-ever deploying, open it with a non-functional title and retitle it later, or add
-`no preview` right after opening and accept one deploy. Likewise, a PR opened
+ever deploying, open it with a non-functional title, add `no preview`, then
+retitle it; or add `no preview` right after opening and accept one deploy. Likewise, a PR opened
 with `preview` already applied may build twice (`opened` and `labeled`);
 concurrency cancels one of them.
 
@@ -90,17 +90,17 @@ Create `preview` and `no preview` in each consuming repo. `do not merge` is
 already part of the fleet's label roster.
 
 The label names are fixed in the workflow, not inputs. They are a fleet
-contract, and a per-repo override would let one repo drift from it. The test in
-[`test/vercel-preview-workflow.test.ts`](../test/vercel-preview-workflow.test.ts)
-runs the gate against sample events, so any change to these rules is
-deliberate.
+contract, and a per-repo override would let one repo drift from it.
+[`test/vercel-preview-gate.test.ts`](../test/vercel-preview-gate.test.ts) runs
+the gate against sample events with GitHub's own expression evaluator, so any
+change to these rules is deliberate.
 
 ## History: the UAT labels
 
-Before v3.0.0, a preview deployed only when a non-draft PR carried `UAT ready` (or
-the legacy `ready for UAT`), and `ready_for_review` deployed. That gate depended
-on a review step applying the label, which the fleet no longer does. The UAT
-labels now have no effect on previews. To upgrade a caller, see
+Before v3.0.0, a preview deployed only when a non-draft PR carried `UAT ready`
+(or the legacy `ready for UAT`), and `ready_for_review` deployed. That gate
+depended on a review step applying the label, which the fleet no longer does.
+The UAT labels now have no effect on previews. To upgrade a caller, see
 [Upgrading from v2](consuming.md#upgrading-from-v2).
 
 ## Concurrency
