@@ -95,12 +95,11 @@ and **self-manages** its config. Fix conformance gaps directly here, in a PR.
 
 - **Hygiene** comes from the [`repo-hygiene.yml`](.github/workflows/repo-hygiene.yml)
   caller, configured in [`.repo-hygiene.yml`](.repo-hygiene.yml).
-- **PR lifecycle and auto-merge:** [`pr-lifecycle.yml`](.github/workflows/pr-lifecycle.yml)
-  runs the shared `rmartz/pr-lifecycle-action` with `uat: 'off'` (matching the
-  `pr-policy` caller's `skip-uat`). It converges each PR's
-  lifecycle labels and arms native auto-merge only once the PR is `approved`
-  (eligible Dependabot and release-please PRs included). The ruleset requires no
-  approving review, so this is the approval gate for automated merges.
+- **Bot auto-merge:** [`bot-automerge.yml`](.github/workflows/bot-automerge.yml)
+  calls the shared `rmartz/bot-automerge-action` reusable workflow, which arms
+  native auto-merge on green Dependabot patch/minor bumps with the
+  rmartz-merge-bot App token (`MERGE_BOT_CLIENT_ID` / `MERGE_BOT_PRIVATE_KEY`).
+  Every other PR is driven to merge by the session that opened it.
 - **Safe merge:** [`merge-safety.yml`](.github/workflows/merge-safety.yml)
   (required check `merge-safety`).
 - **PR policy:** [`pr-policy.yml`](.github/workflows/pr-policy.yml) runs the
@@ -110,11 +109,9 @@ and **self-manages** its config. Fix conformance gaps directly here, in a PR.
   it ships are user-facing, so this is a decision, not a claim there's nothing to
   test). Its trigger
   includes `ready_for_review` and `converted_to_draft`, because the title check's
-  WIP rule depends on draft state, and `status`, filtered to
-  `pr-lifecycle/sign-off`, so the gate re-runs when pr-lifecycle's sign-off
-  status lands; it trusts that status from `rmartz-pr-lifecycle[bot]`
-  (`sign-off-status-creators`).
-  [`test/pr-policy-workflow.test.ts`](test/pr-policy-workflow.test.ts) guards both.
+  WIP rule depends on draft state.
+  [`test/pr-policy-workflow.test.ts`](test/pr-policy-workflow.test.ts) guards the
+  trigger list.
 - **CI** ([ci.yml](.github/workflows/ci.yml)): Typecheck, Lint (actionlint,
   which also runs shellcheck on every `run:` block), Format, and Test, plus the
   post-merge commit-convention tripwire. PR titles are checked by pr-policy's
@@ -162,7 +159,7 @@ Before pushing, run `ai-pre-push-verify -C <worktree>` and fix every failure.
   ships to consumers, so it takes a releasing type (`feat:` / `fix:` / `perf:`),
   never `ci:`, which cuts no release. `ci:` is for this repo's **own** CI:
   `ci.yml`, `release*.yml`, `repo-hygiene.yml`, `merge-safety.yml`,
-  `pr-lifecycle.yml`, `pr-policy.yml`, the tripwire, and
+  `bot-automerge.yml`, `pr-policy.yml`, the tripwire, and
   `.github/actions/setup`.
 
 ## Agent directive files
