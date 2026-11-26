@@ -97,7 +97,7 @@ describe('docs/golden-pattern.md callers', () => {
   it('subscribes the preview caller to every activity type the gate reads', () => {
     expect(byFile('vercel-preview.yml')?.caller.on).toEqual({
       pull_request: {
-        types: ['labeled', 'unlabeled', 'synchronize', 'reopened', 'ready_for_review'],
+        types: ['opened', 'synchronize', 'reopened', 'edited', 'labeled', 'unlabeled'],
       },
     });
   });

@@ -42,7 +42,6 @@ const readText = (path: string) => readFileSync(new URL(`../${path}`, import.met
 const workflow = parse(readText('.github/workflows/vercel-preview.yml')) as Workflow;
 const job = workflow.jobs?.deploy ?? {};
 const steps = job.steps ?? [];
-const gate = job.if ?? '';
 const stepNamed = (name: string) => steps.find((step) => step.name === name);
 const stepIndex = (name: string) => steps.findIndex((step) => step.name === name);
 const call = workflow.on?.workflow_call ?? {};
@@ -95,31 +94,6 @@ describe('vercel-preview.yml public interface', () => {
       'VERCEL_PROJECT_ID',
       'VERCEL_TOKEN',
     ]);
-  });
-});
-
-describe('vercel-preview.yml gate', () => {
-  it('skips fork PRs so the Vercel token never reaches fork-authored code', () => {
-    expect(gate).toContain('github.event.pull_request.head.repo.full_name == github.repository');
-  });
-
-  it('skips drafts and PRs held by `do not merge`', () => {
-    expect(gate).toContain('!github.event.pull_request.draft');
-    expect(gate).toContain("!contains(github.event.pull_request.labels.*.name, 'do not merge')");
-  });
-
-  // Both spellings while the fleet-wide rename (rmartz/dotfiles#1572) is in
-  // progress. Dropping `ready for UAT` is a breaking change for any consumer
-  // still on the old label — ship it as a major.
-  it.each(['UAT ready', 'ready for UAT'])('deploys on the %s label', (label) => {
-    expect(gate).toContain(`contains(github.event.pull_request.labels.*.name, '${label}')`);
-    expect(gate).toContain(`github.event.label.name == '${label}'`);
-  });
-
-  it('redeploys when `do not merge` is removed', () => {
-    expect(gate).toContain(
-      "github.event.action == 'unlabeled' && github.event.label.name == 'do not merge'",
-    );
   });
 });
 

@@ -1,7 +1,7 @@
 ---
 type: Reference
 title: The golden pattern — production, staging and per-PR previews
-description: The supported way to consume vercel-preview-ci. Three tiers (production, staging, per-PR UAT previews) on custom hosts, with copy-paste caller workflows, the vercel.json setting, a DNS and Vercel setup checklist, and the known limits. Works on the Hobby plan.
+description: The supported way to consume vercel-preview-ci. Three tiers (production, staging, per-PR previews) on custom hosts, with copy-paste caller workflows, the vercel.json setting, a DNS and Vercel setup checklist, and the known limits. Works on the Hobby plan.
 tags: [vercel, golden-pattern, staging, preview, domains, dns, consuming]
 ---
 
@@ -11,11 +11,11 @@ This is the supported way to consume `vercel-preview-ci`. It gives a Vercel
 project three tiers, each on a host you own, on any plan including Hobby. It
 needs no Custom Environments and no paid Preview Deployment Suffix.
 
-| Tier       | Code           | Vercel environment | Host                         | Deployed by                                          |
-| ---------- | -------------- | ------------------ | ---------------------------- | ---------------------------------------------------- |
-| Production | default branch | Production         | `app.example.com`            | Vercel's Git integration, default branch only        |
-| Staging    | default branch | Preview            | `staging.example.com`        | [`vercel-staging.yml`](staging.md), on each push     |
-| Preview    | a PR's head    | Preview            | `pr-<N>.preview.example.com` | [`vercel-preview.yml`](consuming.md), on `UAT ready` |
+| Tier       | Code           | Vercel environment | Host                         | Deployed by                                             |
+| ---------- | -------------- | ------------------ | ---------------------------- | ------------------------------------------------------- |
+| Production | default branch | Production         | `app.example.com`            | Vercel's Git integration, default branch only           |
+| Staging    | default branch | Preview            | `staging.example.com`        | [`vercel-staging.yml`](staging.md), on each push        |
+| Preview    | a PR's head    | Preview            | `pr-<N>.preview.example.com` | [`vercel-preview.yml`](consuming.md), on functional PRs |
 
 The callers below are checked against the workflows' declared inputs and
 permissions by
@@ -49,14 +49,14 @@ Vercel's Git integration keeps deploying production. Every other branch is
 deployed only by the two workflows (see
 [Disabling Git-integration previews](disabling-git-previews.md)).
 
-### `.github/workflows/preview-deploy.yml`: per-PR UAT previews
+### `.github/workflows/preview-deploy.yml`: per-PR previews
 
 ```yaml
 name: Preview Deploy
 
 on:
   pull_request:
-    types: [labeled, unlabeled, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
 
 permissions:
   contents: read
@@ -137,7 +137,8 @@ Use the CNAME target Vercel shows for each domain.
 **Allowlists:** add the production, staging and preview hosts to each auth
 provider's allowlist.
 
-**Labels:** make sure the repo has the `UAT ready` label.
+**Labels:** make sure the repo has the `preview` and `no preview` labels (see
+[The deploy gate](gating.md#the-labels)).
 
 **Dependabot:** make sure `.github/dependabot.yml` has a `github-actions` entry
 so both pins stay current.

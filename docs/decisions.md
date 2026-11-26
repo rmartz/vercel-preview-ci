@@ -54,11 +54,11 @@ version back.
 
 The per-repo Ignored Build Step scripts were a poor thing to share. They run
 inside Vercel's build, not in Actions, so a shared copy would need registry auth
-wired into each Vercel build environment. Under the label-driven model they also
+wired into each Vercel build environment. Under the gated model they also
 have only one decision left, "production only", and `git.deploymentEnabled`
 states that in `vercel.json` with no code. See
 [Disabling Git-integration previews](disabling-git-previews.md).
 
-## The UAT labels are fixed, not inputs
+## The gate's labels are fixed, not inputs
 
-See [The deploy gate](gating.md#the-label-rename).
+See [The deploy gate](gating.md#the-labels).

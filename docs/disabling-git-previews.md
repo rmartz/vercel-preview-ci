@@ -7,8 +7,8 @@ tags: [vercel, vercel-json, git-integration, ignored-build-step]
 
 # Disabling Git-integration previews
 
-The label-driven model needs Vercel's Git integration to deploy **production
-only**. Without that, every push still builds a preview, and labelled PRs get a
+The gated model needs Vercel's Git integration to deploy **production
+only**. Without that, every push still builds a preview, and functional PRs get a
 second one from this workflow. The Git integration has to stop building
 previews, and `main` has to keep deploying to production.
 
@@ -55,10 +55,10 @@ either.
 
 After the change merges:
 
-1. Push a commit to a non-`main` branch with an open PR and no UAT label. The
-   Vercel dashboard should show **no** new deployment for that branch.
-2. Add `UAT ready` to the PR. A preview should appear from the workflow, and its
-   URL should be posted on the PR.
+1. Push a commit to a non-`main` branch with an open `chore:` PR. The Vercel
+   dashboard should show **no** new deployment for that branch.
+2. Add `preview` to the PR (or retitle it `feat: …`). A preview should appear
+   from the workflow, and its URL should be posted on the PR.
 3. Merge to `main`. A production deployment should appear from the Git
    integration as before.
 

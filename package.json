@@ -2,12 +2,11 @@
   "name": "@rmartz/vercel-preview-ci",
   "version": "0.0.0",
   "private": true,
-  "description": "Label-driven Vercel preview deploys for the fleet's Vercel-hosted repos: a reusable workflow that deploys a preview with the Vercel CLI only when a PR is marked UAT ready, kept current in consumers by Dependabot.",
+  "description": "Gated Vercel preview deploys for the fleet's Vercel-hosted repos: a reusable workflow that deploys a preview with the Vercel CLI only for functional PRs (feat/fix/perf/revert titles or a preview label), kept current in consumers by Dependabot.",
   "keywords": [
     "ci",
     "vercel",
     "preview",
-    "uat",
     "github-actions",
     "reusable-workflow"
   ],
@@ -34,6 +33,7 @@
     "vercel": "65.12.1"
   },
   "devDependencies": {
+    "@actions/expressions": "0.3.61",
     "@types/node": "26.6.6",
     "prettier": "3.10.1",
     "typescript": "7.0.2",

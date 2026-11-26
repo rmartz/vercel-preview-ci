@@ -16,7 +16,7 @@ name: Preview Deploy
 
 on:
   pull_request:
-    types: [labeled, unlabeled, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
 
 permissions:
   contents: read
@@ -33,9 +33,13 @@ Replace `<sha>` with the commit of the latest
 [release](https://github.com/rmartz/vercel-preview-ci/releases), and keep the
 full `# vX.Y.Z` comment so Dependabot can bump it.
 
-- **Triggers:** subscribe to all five activity types. The workflow's gate decides
-  which events deploy (see [The deploy gate](gating.md)). Use `pull_request`,
-  not `pull_request_target`. The gate rejects anything else.
+- **Triggers:** subscribe to all six activity types. The workflow's gate decides
+  which events deploy (see [The deploy gate](gating.md)). `edited` is needed so
+  retitling a PR to a functional type deploys it. Leave out
+  `ready_for_review`: the gate ignores it. Use `pull_request`, not
+  `pull_request_target`. The gate rejects anything else.
+- **Labels:** create `preview` (forces a deploy) and `no preview` (always
+  skips) in the repo.
 - **Permissions:** a called workflow can only narrow the caller's grant, so the
   caller must grant all three. `pull-requests: write` posts the comment.
   `packages: read` lets the build install a GitHub Packages dependency if the
@@ -57,14 +61,15 @@ full `# vX.Y.Z` comment so Dependabot can bump it.
 The job fails with a clear error if any of them is missing. Repos that already
 ran a per-repo `preview-deploy.yml` have them set.
 
-A run that **Dependabot** triggers (for example, its rebase of a labelled PR)
-receives only Dependabot secrets and a read-only token. Such a run fails at the
-secrets check unless the three secrets are also set with
+A run that **Dependabot** triggers (for example, its rebase of a PR labelled
+`preview`) receives only Dependabot secrets and a read-only token. Such a run
+fails at the secrets check unless the three secrets are also set with
 `gh secret set <name> --app dependabot`. If they are set, the preview deploys,
 but the comment step is skipped because the token cannot write. The URL is still
 in the job summary and the `url` output. A run started by a person labelling a
-Dependabot PR is an ordinary run and comments as usual. Dependabot bumps rarely
-need UAT, so most repos can leave the Dependabot secrets unset.
+Dependabot PR is an ordinary run and comments as usual. The gate skips
+Dependabot PRs unless they carry `preview`, so most repos can leave the
+Dependabot secrets unset.
 
 ## Inputs and output
 
@@ -93,7 +98,7 @@ e2e:
 
 ## A per-PR preview hostname
 
-`alias-domain` gives each PR's UAT preview its own host under a domain you
+`alias-domain` gives each PR's preview its own host under a domain you
 control, built from the PR number:
 
 ```yaml
@@ -108,7 +113,7 @@ jobs:
 A service with a domain allowlist (OAuth redirect URIs, Firebase authorized
 domains, Sentry allowed domains) can then list hosts you own instead of the
 `vercel.app` parent domain, which would trust every Vercel deployment. Several
-PRs can sit in UAT at once, each on its own host. It needs no paid Preview
+PRs can be under test at once, each on its own host. It needs no paid Preview
 Deployment Suffix and works on the Hobby plan.
 
 A stable staging host, one URL for the default branch's code, is not the
@@ -126,10 +131,10 @@ After each successful deploy the workflow runs
 deploy. The alias URL appears in the job summary, the `alias-url` output, and
 the sticky comment. The comment leads with the alias URL and lists the raw
 `*.vercel.app` URL below it as `Deployment:`. Each new push to the PR moves the
-PR's host to the new preview. Removing the UAT label leaves the host pointing at
-that PR's last preview, the same as the preview itself (see
-[The deploy gate](gating.md#which-events-deploy)). Hosts are not cleaned up when
-the PR closes
+PR's host to the new preview. When the PR stops qualifying (for example, it
+gets `no preview`), the host keeps pointing at that PR's last preview, the same
+as the preview itself (see [The deploy gate](gating.md#which-events-deploy)).
+Hosts are not cleaned up when the PR closes
 ([rmartz/vercel-preview-ci#4](https://github.com/rmartz/vercel-preview-ci/issues/4)).
 
 The value must be a bare hostname once the expression is expanded, without a
@@ -157,10 +162,25 @@ The repo's `.github/dependabot.yml` needs a `github-actions` entry. That entry
 bumps this workflow's `@<sha>` pin with each release. Each Vercel CLI bump in
 this repo is a release, so consumers receive CLI updates through the same pin.
 
+## Upgrading from v2
+
+v3 replaced the `UAT ready` label gate with the title-type gate (see
+[The deploy gate](gating.md)). Dependabot bumps the pin on its own, but a
+caller that keeps its v2 trigger misses `opened` and `edited`: a new `feat:` PR
+then deploys only on its next push, and a retitle never deploys. Nothing fails,
+so make these changes with the pin bump:
+
+1. Change the caller's trigger to
+   `types: [opened, synchronize, reopened, edited, labeled, unlabeled]`,
+   dropping `ready_for_review`.
+2. Create the `preview` and `no preview` labels.
+3. Retire `UAT ready` and `ready for UAT` from any preview tooling; they no
+   longer deploy anything.
+
 ## Migrating a repo that has its own preview-deploy.yml
 
 1. Replace the body of `.github/workflows/preview-deploy.yml` with the caller
-   above.
+   above, and create the `preview` and `no preview` labels.
 2. Turn off Git-integration previews in `vercel.json` and delete the
    `ignoreCommand` key and the `scripts/vercel-ignore-build.*` script (plus any
    `lib/` helpers and tests used only by it). See
