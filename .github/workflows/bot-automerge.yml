@@ -10,8 +10,9 @@ name: bot-automerge
 # Dependabot secrets). A merge armed with GITHUB_TOKEN would fire no push
 # workflows, so release.yml would never run for a `fix(deps)` vercel bump.
 #
-# Native auto-merge waits on the ruleset's required checks (merge-safety, CI,
-# pr-policy, release-check), so it never merges ahead of CI. pull_request_target
+# Native auto-merge waits on the ruleset's required checks (Typecheck, Lint,
+# Format, Test, hygiene, release-check, pr-policy, merge-safety), so it never
+# merges ahead of CI. pull_request_target
 # gives Dependabot's read-only-token PRs base-context write; nothing checks out
 # or runs the PR's code.
 
