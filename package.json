@@ -33,8 +33,8 @@
     "vercel": "66.6.0"
   },
   "devDependencies": {
-    "@actions/expressions": "0.3.61",
-    "@types/node": "26.6.6",
+    "@actions/expressions": "0.3.62",
+    "@types/node": "26.6.7",
     "prettier": "3.10.1",
     "typescript": "7.0.2",
     "vitest": "5.1.1",
