@@ -90,8 +90,8 @@ inline their setup steps.
 ## Repository conformance
 
 This repo is held to the shared
-[repository checklist](https://github.com/rmartz/ai/blob/main/docs/guidance/repository-checklist.md)
-and **self-manages** its config. Fix conformance gaps directly here, in a PR.
+repository checklist (`~/.claude/knowledge/guidance/repository-checklist.md` in
+the agent knowledge base) and **self-manages** its config. Fix conformance gaps directly here, in a PR.
 
 - **Hygiene** comes from the [`repo-hygiene.yml`](.github/workflows/repo-hygiene.yml)
   caller, configured in [`.repo-hygiene.yml`](.repo-hygiene.yml).
