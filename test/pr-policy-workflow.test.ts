@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
  * Nothing else fails when the trigger list drops them: the stale green verdict
  * just stands, and a WIP-titled PR can merge.
  *
- * pr-policy-action v2 no longer reads pr-lifecycle's sign-off status, so the
+ * pr-policy-action v2 no longer reads an external sign-off status, so the
  * caller runs on pull_request_target alone, unfiltered.
  */
 
