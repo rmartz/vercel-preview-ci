@@ -42,7 +42,7 @@ Before this repo existed, each Vercel repo had its own copy of the gating, and
 the copies had drifted into three policies:
 
 - **Title heuristic:** an Ignored Build Step script that allowed a preview only
-  for `feat`/`fix` PR titles (firebase-nextjs-template, trip-split).
+  for `feat`/`fix` PR titles (firebase-nextjs-template and one other repo).
 - **Branch prefix:** an Ignored Build Step that allowed `feat/` and `fix/`
   branches (hidden-role-game). That repo also ran the label workflow, so a
   labelled PR got **two** previews per push.
