@@ -30,7 +30,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "vercel": "65.12.1"
+    "vercel": "66.6.0"
   },
   "devDependencies": {
     "@actions/expressions": "0.3.61",
