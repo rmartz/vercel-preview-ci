@@ -31,7 +31,7 @@ updates:
     schedule:
       interval: weekly
     commit-message:
-      # Split by dependency type (rmartz/ai#82). The only production dependency
+      # Split by dependency type. The only production dependency
       # is `vercel`: the reusable workflow installs exactly that version in every
       # consumer, so its bump is a `fix` that cuts a release. A dev-dependency
       # bump never reaches the consumer-run path, so it is a release-less `chore`.
